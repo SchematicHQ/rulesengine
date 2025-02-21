@@ -1,0 +1,22 @@
+linters:
+  disable:
+    - gosimple
+  enable:
+    - forbidigo
+    - goimports
+    - gosec
+    - nilerr
+    - predeclared
+    - reassign
+    - sqlclosecheck
+    - unconvert
+
+linters-settings:
+  forbidigo:
+    forbid:
+      - 'fmt\.Print*'
+      - 'spew.Dump'
+  gosec:
+    excludes:
+      - G601 # Implicit memory aliasing - no longer relevant after go 1.22
+

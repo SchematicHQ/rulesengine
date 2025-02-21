@@ -1,0 +1,32 @@
+version: "3"
+
+tasks:
+  install:
+    desc: Install dependencies
+    preconditions:
+      - sh: command -v brew &> /dev/null
+        msg: "Brew not found. Please install brew before running this task."
+    cmds:
+      - brew install go
+      - go get
+
+  lint:
+    desc: Run Go linter
+    preconditions:
+      - sh: command -v golangci-lint &> /dev/null
+        msg: "golangci-lint not found. run `brew install golangci-lint` to install it."
+    cmds:
+      - golangci-lint run ./...
+
+  test:
+    desc: Run tests
+    cmd: go test -coverprofile cover.out -coverpkg ./... ./...
+
+  test:coverage:
+    desc: View test coverage in browser
+    cmd: go tool cover -html cover.out
+
+  test:reset:
+    desc: Reset test cache
+    cmds:
+      - go clean -testcache
