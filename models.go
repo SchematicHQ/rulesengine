@@ -1,6 +1,7 @@
 package rulesengine
 
 import (
+	"sync"
 	"time"
 
 	"github.com/schematichq/rulesengine/typeconvert"
@@ -129,6 +130,7 @@ type Company struct {
 	Metrics           CompanyMetricCollection `json:"metrics"`
 	Subscription      *Subscription           `json:"subscription"`
 	Traits            []*Trait                `json:"traits"`
+	mu                sync.Mutex              `json:"-"` // mutex for thread safety
 }
 
 func (c *Company) getTraitByDefinitionID(traitDefinitionID string) *Trait {
@@ -147,6 +149,37 @@ func (c *Company) getTraitByDefinitionID(traitDefinitionID string) *Trait {
 	}
 
 	return nil
+}
+
+// AddMetric adds a new metric to the company's metrics collection or replaces an existing one
+// that matches the same unique constraint (eventSubtype, period, and monthReset).
+// It uses a mutex to ensure thread safety.
+func (c *Company) AddMetric(metric *CompanyMetric) {
+	if c == nil || metric == nil {
+		return
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if len(c.Metrics) == 0 {
+		c.Metrics = CompanyMetricCollection{metric}
+		return
+	}
+
+	// Loop through once, either replace an existing metric or append a new one
+	for i, m := range c.Metrics {
+		if m.EventSubtype == metric.EventSubtype &&
+			m.Period == metric.Period &&
+			m.MonthReset == metric.MonthReset {
+			// Found a match, replace it
+			c.Metrics[i] = metric
+			return
+		}
+	}
+
+	// If we get here, no match was found, so append the new metric
+	c.Metrics = append(c.Metrics, metric)
 }
 
 type User struct {
