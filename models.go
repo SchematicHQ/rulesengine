@@ -126,6 +126,7 @@ type Company struct {
 	BasePlanID        *string                 `json:"base_plan_id"`
 	BillingProductIDs []string                `json:"billing_product_ids"`
 	CRMProductIDs     []string                `json:"crm_product_ids"`
+	Keys              map[string]string       `json:"keys"`
 	PlanIDs           []string                `json:"plan_ids"`
 	Metrics           CompanyMetricCollection `json:"metrics"`
 	Subscription      *Subscription           `json:"subscription"`
@@ -187,5 +188,6 @@ type User struct {
 	AccountID     string `json:"account_id"`
 	EnvironmentID string `json:"environment_id"`
 
-	Traits []*Trait `json:"traits"`
+	Keys   map[string]string `json:"keys"`
+	Traits []*Trait          `json:"traits"`
 }
