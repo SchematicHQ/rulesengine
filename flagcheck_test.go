@@ -177,6 +177,8 @@ func TestCheckFlag(t *testing.T) {
 			assert.Equal(t, int64(5), *result.FeatureUsage)
 			assert.NotNil(t, result.FeatureAllocation)
 			assert.Equal(t, int64(10), *result.FeatureAllocation)
+			assert.NotNil(t, result.FeatureUsageEvent)
+			assert.Equal(t, eventSubtype, *result.FeatureUsageEvent)
 		})
 
 		t.Run("Sets usage and allocation for trait condition", func(t *testing.T) {
