@@ -14,6 +14,7 @@ type CheckFlagResult struct {
 	Err                 error
 	FeatureAllocation   *int64
 	FeatureUsage        *int64
+	FeatureUsageEvent   *string
 	FeatureUsagePeriod  *MetricPeriod
 	FeatureUsageResetAt *time.Time
 	FlagID              *string
@@ -65,6 +66,7 @@ func (r *CheckFlagResult) setRuleFields(company *Company, rule *Rule) {
 	var allocation int64
 	if usageCondition.ConditionType == ConditionTypeMetric {
 		if usageCondition.EventSubtype != nil {
+			r.FeatureUsageEvent = usageCondition.EventSubtype
 			usageMetric := company.Metrics.Find(*usageCondition.EventSubtype, usageCondition.MetricPeriod, usageCondition.MetricPeriodMonthReset)
 			if usageMetric != nil {
 				usage = usageMetric.Value
