@@ -2,8 +2,6 @@ package rulesengine
 
 import (
 	"time"
-
-	"github.com/schematichq/rulesengine/null"
 )
 
 type MetricPeriod string
@@ -23,6 +21,70 @@ const (
 	MetricPeriodMonthResetBilling MetricPeriodMonthReset = "billing_cycle"
 )
 
+// Given a calendar-based metric period, return the beginning of the current metric period
+// Will return nil for non-calendar-based metric periods such as all-time or billing cycle
+func GetCurrentMetricPeriodStartForCalendarMetricPeriod(metricPeriod MetricPeriod) *time.Time {
+	switch metricPeriod {
+	case MetricPeriodCurrentDay:
+		// UTC midnight for the current day
+		today := time.Now().UTC().Truncate(24 * time.Hour)
+		return &today
+	case MetricPeriodCurrentWeek:
+		// UTC midnight for the most recent Sunday
+		now := time.Now().UTC()
+		daysSinceSunday := int(now.Weekday())
+		currentSunday := now.Truncate(24 * time.Hour).Add(-time.Duration(daysSinceSunday) * 24 * time.Hour)
+		return &currentSunday
+	case MetricPeriodCurrentMonth:
+		// UTC midnight for the first day of current month
+		now := time.Now().UTC()
+		firstDayOfCurrentMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+		return &firstDayOfCurrentMonth
+	}
+
+	return nil
+}
+
+// Given a company, determine the beginning of the current metric period based on the company's billing subscription
+func GetCurrentMetricPeriodStartForCompanyBillingSubscription(company *Company) *time.Time {
+	// if no subscription exists, we use calendar month reset
+	if company == nil || company.Subscription == nil {
+		return GetCurrentMetricPeriodStartForCalendarMetricPeriod(MetricPeriodCurrentMonth)
+	}
+
+	now := time.Now().UTC()
+	periodStart := company.Subscription.PeriodStart
+
+	// if the start period is in the future, the metric period is from the start of the current calendar month
+	if periodStart.After(now) {
+		return GetCurrentMetricPeriodStartForCalendarMetricPeriod(MetricPeriodCurrentMonth)
+	}
+
+	// find the most recent reset date based on subscription start date
+	currentReset := time.Date(
+		now.Year(),
+		now.Month(),
+		periodStart.Day(),
+		periodStart.Hour(),
+		periodStart.Minute(),
+		periodStart.Second(),
+		periodStart.Nanosecond(),
+		time.UTC,
+	)
+
+	// if the reset date for current month is in the future, use previous month's reset date
+	if currentReset.After(now) {
+		currentReset = currentReset.AddDate(0, -1, 0)
+	}
+
+	// if the current reset is before the subscription period start, use the period start instead
+	if currentReset.Before(periodStart) {
+		return &periodStart
+	}
+
+	return &currentReset
+}
+
 // Given a calendar-based metric period, return the next metric period reset time
 // Will return nil for non-calendar-based metric periods such as all-time or billing cycle
 func GetNextMetricPeriodStartForCalendarMetricPeriod(metricPeriod MetricPeriod) *time.Time {
@@ -30,7 +92,7 @@ func GetNextMetricPeriodStartForCalendarMetricPeriod(metricPeriod MetricPeriod) 
 	case MetricPeriodCurrentDay:
 		// UTC midnight for upcoming day
 		tomorrow := time.Now().UTC().Truncate(24 * time.Hour).Add(24 * time.Hour)
-		return null.Nullable(tomorrow)
+		return &tomorrow
 	case MetricPeriodCurrentWeek:
 		// UTC midnight for upcoming Sunday
 		now := time.Now().UTC()
@@ -40,19 +102,19 @@ func GetNextMetricPeriodStartForCalendarMetricPeriod(metricPeriod MetricPeriod) 
 			daysUntilSunday = 7
 		}
 		upcomingSunday := now.Truncate(24 * time.Hour).Add(time.Duration(daysUntilSunday) * 24 * time.Hour)
-		return null.Nullable(upcomingSunday)
+		return &upcomingSunday
 	case MetricPeriodCurrentMonth:
 		// UTC midnight for the first day of next month
 		now := time.Now().UTC()
 		firstDayOfCurrentMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 		nextMonth := firstDayOfCurrentMonth.AddDate(0, 1, 0)
-		return null.Nullable(nextMonth)
+		return &nextMonth
 	}
 
 	return nil
 }
 
-// Given a company, determine the next metric period start based on the company's billing GetNextMetricPeriodStartForCompanyBillingSubscription
+// Given a company, determine the next metric period start based on the company's billing subscription
 func GetNextMetricPeriodStartForCompanyBillingSubscription(company *Company) *time.Time {
 	// if no subscription exists, we use calendar month reset
 	if company == nil || company.Subscription == nil {
