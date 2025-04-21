@@ -1,22 +1,40 @@
+version: "2"
 linters:
-  disable:
-    - gosimple
   enable:
     - forbidigo
-    - goimports
     - gosec
     - nilerr
     - predeclared
     - reassign
     - sqlclosecheck
     - unconvert
-
-linters-settings:
-  forbidigo:
-    forbid:
-      - 'fmt\.Print*'
-      - 'spew.Dump'
-  gosec:
-    excludes:
-      - G601 # Implicit memory aliasing - no longer relevant after go 1.22
-
+  disable:
+    - staticcheck
+  settings:
+    forbidigo:
+      forbid:
+        - pattern: fmt\.Print*
+        - pattern: spew.Dump
+    gosec:
+      excludes:
+        - G601
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
