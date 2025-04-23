@@ -8,6 +8,7 @@ import (
 type ConditionType string
 
 const (
+	ConditionTypeUnknown        ConditionType = ""
 	ConditionTypeBasePlan       ConditionType = "base_plan"
 	ConditionTypeBillingProduct ConditionType = "billing_product"
 	ConditionTypeCompany        ConditionType = "company"
@@ -21,6 +22,7 @@ const (
 type EntityType string
 
 const (
+	EntityTypeUnknown EntityType = ""
 	EntityTypeUser    EntityType = "user"
 	EntityTypeCompany EntityType = "company"
 )
@@ -36,6 +38,7 @@ func (t *RuleType) isEntitlement() bool {
 }
 
 const (
+	RuleTypeUnknown                      RuleType = ""
 	RuleTypeGlobalOverride               RuleType = "global_override" // Global on/off toggle; will not have any conditions, only a value
 	RuleTypeCompanyOverride              RuleType = "company_override"
 	RuleTypeCompanyOverrideUsageExceeded RuleType = "company_override_usage_exceeded"
@@ -50,6 +53,7 @@ const (
 type RulePrioritizationMethod string
 
 const (
+	RulePrioritizationMethodUnknown    RulePrioritizationMethod = ""
 	RulePrioritizationMethodNone       RulePrioritizationMethod = "none"
 	RulePrioritizationMethodPriority   RulePrioritizationMethod = "priority"
 	RulePrioritizationMethodOptimistic RulePrioritizationMethod = "optimistic"

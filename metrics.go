@@ -7,6 +7,7 @@ import (
 type MetricPeriod string
 
 const (
+	MetricPeriodUnknown      MetricPeriod = ""
 	MetricPeriodAllTime      MetricPeriod = "all_time"
 	MetricPeriodCurrentDay   MetricPeriod = "current_day"
 	MetricPeriodCurrentMonth MetricPeriod = "current_month"
@@ -17,6 +18,7 @@ const (
 type MetricPeriodMonthReset string
 
 const (
+	MetricPeriodMonthResetUnknown MetricPeriodMonthReset = ""
 	MetricPeriodMonthResetFirst   MetricPeriodMonthReset = "first_of_month"
 	MetricPeriodMonthResetBilling MetricPeriodMonthReset = "billing_cycle"
 )
