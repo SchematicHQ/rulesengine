@@ -1,6 +1,7 @@
 package rulesengine
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -13,6 +14,56 @@ const (
 	MetricPeriodCurrentWeek  MetricPeriod = "current_week"
 )
 
+// ToInt converts MetricPeriod to its integer representation
+func (mp MetricPeriod) ToInt() int {
+	switch mp {
+	case MetricPeriodAllTime:
+		return 0
+	case MetricPeriodCurrentDay:
+		return 1
+	case MetricPeriodCurrentWeek:
+		return 2
+	case MetricPeriodCurrentMonth:
+		return 3
+	default:
+		return 0
+	}
+}
+
+// Format implements fmt.Formatter interface
+func (mp MetricPeriod) Format(f fmt.State, verb rune) {
+	switch verb {
+	case 'd':
+		fmt.Fprintf(f, "%d", mp.ToInt())
+	case 's':
+		fmt.Fprintf(f, "%s", string(mp))
+	case 'v':
+		if f.Flag('#') {
+			fmt.Fprintf(f, "MetricPeriod(%s)", string(mp))
+		} else {
+			fmt.Fprintf(f, "%s", string(mp))
+		}
+	default:
+		fmt.Fprintf(f, "%%!%c(MetricPeriod=%s)", verb, string(mp))
+	}
+}
+
+// MetricPeriodFromInt converts an integer to MetricPeriod
+func MetricPeriodFromInt(i int) MetricPeriod {
+	switch i {
+	case 0:
+		return MetricPeriodAllTime
+	case 1:
+		return MetricPeriodCurrentDay
+	case 2:
+		return MetricPeriodCurrentWeek
+	case 3:
+		return MetricPeriodCurrentMonth
+	default:
+		return MetricPeriodAllTime
+	}
+}
+
 // For MetricPeriodMonth, there's an additional option indicating when the month should reset
 type MetricPeriodMonthReset string
 
@@ -20,6 +71,48 @@ const (
 	MetricPeriodMonthResetFirst   MetricPeriodMonthReset = "first_of_month"
 	MetricPeriodMonthResetBilling MetricPeriodMonthReset = "billing_cycle"
 )
+
+// ToInt converts MetricPeriodMonthReset to its integer representation
+func (mr MetricPeriodMonthReset) ToInt() int {
+	switch mr {
+	case MetricPeriodMonthResetFirst:
+		return 0
+	case MetricPeriodMonthResetBilling:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// Format implements fmt.Formatter interface
+func (mr MetricPeriodMonthReset) Format(f fmt.State, verb rune) {
+	switch verb {
+	case 'd':
+		fmt.Fprintf(f, "%d", mr.ToInt())
+	case 's':
+		fmt.Fprintf(f, "%s", string(mr))
+	case 'v':
+		if f.Flag('#') {
+			fmt.Fprintf(f, "MetricPeriodMonthReset(%s)", string(mr))
+		} else {
+			fmt.Fprintf(f, "%s", string(mr))
+		}
+	default:
+		fmt.Fprintf(f, "%%!%c(MetricPeriodMonthReset=%s)", verb, string(mr))
+	}
+}
+
+// MetricPeriodMonthResetFromInt converts an integer to MetricPeriodMonthReset
+func MetricPeriodMonthResetFromInt(i int) MetricPeriodMonthReset {
+	switch i {
+	case 0:
+		return MetricPeriodMonthResetFirst
+	case 1:
+		return MetricPeriodMonthResetBilling
+	default:
+		return MetricPeriodMonthResetFirst
+	}
+}
 
 // Given a calendar-based metric period, return the beginning of the current metric period
 // Will return nil for non-calendar-based metric periods such as all-time or billing cycle
