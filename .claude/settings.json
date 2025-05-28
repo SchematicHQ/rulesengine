@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go test:*)",
+      "Bash(task install)",
+      "Bash(task lint)",
+      "Bash(task test)",
+      "Bash(task test:reset)"
+    ],
+    "deny": []
+  }
+}

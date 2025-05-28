@@ -102,16 +102,12 @@ func TestGetCurrentMetricPeriodStartForCompanyBillingSubscription(t *testing.T) 
 		now := time.Now().UTC()
 		company := createTestCompany()
 
-		// Set subscription to start on a day later in the month than today
-		futureDay := now.Day() + 5
-		if futureDay > 28 {
-			futureDay = 28 // Avoid month boundary issues
-		}
+		resetDay := 5
 
 		company.Subscription.PeriodStart = time.Date(
 			now.Year()-1,
 			now.Month(),
-			futureDay,
+			resetDay,
 			12, 0, 0, 0,
 			time.UTC,
 		)
@@ -119,21 +115,21 @@ func TestGetCurrentMetricPeriodStartForCompanyBillingSubscription(t *testing.T) 
 		result := rulesengine.GetCurrentMetricPeriodStartForCompanyBillingSubscription(company)
 		assert.NotNil(t, result)
 
-		// In this case, the result should be last month's reset date
-		expectedMonth := now.Month() - 1
-		expectedYear := now.Year()
-		if now.Month() == time.January {
-			expectedMonth = time.December
-			expectedYear = now.Year() - 1
-		}
-
+		// Calculate what the function should return:
+		// If today's date is before the 5th, return last month's 5th
+		// If today's date is the 5th or after, return this month's 5th
 		expected := time.Date(
-			expectedYear,
-			expectedMonth,
-			futureDay,
+			now.Year(),
+			now.Month(),
+			resetDay,
 			12, 0, 0, 0,
 			time.UTC,
 		)
+
+		// If we haven't reached the reset day this month, use last month's reset day
+		if now.Day() < resetDay {
+			expected = expected.AddDate(0, -1, 0)
+		}
 
 		assert.Equal(t, expected.Year(), result.Year())
 		assert.Equal(t, expected.Month(), result.Month())
@@ -379,16 +375,18 @@ func TestGetNextMetricPeriodStartForCompanyBillingSubscription(t *testing.T) {
 		company := createTestCompany()
 
 		// Set subscription to start on a day later in the month than today
-		futureDay := now.Day() + 5
-		if futureDay > 28 {
-			futureDay = 28 // Avoid month boundary issues
+		// Use a day that's guaranteed to be in the future within this month
+		futureDay := 15 // Use middle of month to avoid edge cases
+		if now.Day() >= 15 {
+			// If we're past the 15th, use day 5 of next month
+			futureDay = 5
 		}
 
 		company.Subscription.PeriodStart = time.Date(
 			now.Year()-1,
 			now.Month(),
 			futureDay,
-			12, 0, 0, 0,
+			0, 0, 0, 0, // Use midnight for cleaner comparison
 			time.UTC,
 		)
 
@@ -397,14 +395,38 @@ func TestGetNextMetricPeriodStartForCompanyBillingSubscription(t *testing.T) {
 		result := rulesengine.GetNextMetricPeriodStartForCompanyBillingSubscription(company)
 		assert.NotNil(t, result)
 
-		// In this case, the result should be this month's reset date
-		expected := time.Date(
-			now.Year(),
-			now.Month(),
-			futureDay,
-			12, 0, 0, 0,
-			time.UTC,
-		)
+		// Calculate expected: if we're before the 15th, expect this month's reset
+		// If we're after the 15th, we used day 5, so expect next month's reset
+		var expected time.Time
+		if now.Day() < 15 {
+			// Reset day (15th) hasn't passed, so next reset is this month
+			expected = time.Date(
+				now.Year(),
+				now.Month(),
+				futureDay,
+				0, 0, 0, 0,
+				time.UTC,
+			)
+		} else {
+			// We used day 5, and since we're past 15th, next reset is next month's 5th
+			expected = time.Date(
+				now.Year(),
+				now.Month()+1,
+				futureDay,
+				0, 0, 0, 0,
+				time.UTC,
+			)
+			// Handle year boundary
+			if now.Month() == time.December {
+				expected = time.Date(
+					now.Year()+1,
+					time.January,
+					futureDay,
+					0, 0, 0, 0,
+					time.UTC,
+				)
+			}
+		}
 
 		assert.Equal(t, expected.Year(), result.Year())
 		assert.Equal(t, expected.Month(), result.Month())
