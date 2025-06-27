@@ -122,7 +122,7 @@ func (s *RuleCheckService) checkCompanyCondition(ctx context.Context, company *C
 }
 
 func (s *RuleCheckService) checkCreditBalanceCondition(ctx context.Context, company *Company, condition *Condition) (bool, error) {
-	if condition.ConditionType != ConditionTypeCredit || company == nil && condition.CreditID == nil {
+	if condition.ConditionType != ConditionTypeCredit || company == nil || condition.CreditID == nil {
 		return false, nil
 	}
 
