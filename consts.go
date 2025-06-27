@@ -10,6 +10,7 @@ type ConditionType string
 const (
 	ConditionTypeBasePlan       ConditionType = "base_plan"
 	ConditionTypeBillingProduct ConditionType = "billing_product"
+	ConditionTypeCredit         ConditionType = "credit"
 	ConditionTypeCompany        ConditionType = "company"
 	ConditionTypeCrmProduct     ConditionType = "crm_product"
 	ConditionTypeMetric         ConditionType = "metric"

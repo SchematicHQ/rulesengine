@@ -81,6 +81,8 @@ func (s *RuleCheckService) checkCondition(ctx context.Context, company *Company,
 		return s.checkBillingProductCondition(ctx, company, condition)
 	case ConditionTypeCrmProduct:
 		return s.checkCrmProductCondition(ctx, company, condition)
+	case ConditionTypeCredit:
+		return s.checkCreditBalanceCondition(ctx, company, condition)
 	}
 
 	return
@@ -117,6 +119,27 @@ func (s *RuleCheckService) checkCompanyCondition(ctx context.Context, company *C
 	}
 
 	return resourceMatch, nil
+}
+
+func (s *RuleCheckService) checkCreditBalanceCondition(ctx context.Context, company *Company, condition *Condition) (bool, error) {
+	if condition.ConditionType != ConditionTypeCredit || company == nil && condition.CreditID == nil {
+		return false, nil
+	}
+
+	var consumptionCost = float64(1)
+	if condition.ConsumptionRate != nil {
+		consumptionCost = *condition.ConsumptionRate
+	}
+
+	var creditBalance float64
+	for creditID, balance := range company.CreditBalances {
+		if creditID == *condition.CreditID {
+			creditBalance = balance
+			break
+		}
+	}
+
+	return creditBalance >= consumptionCost, nil
 }
 
 func (s *RuleCheckService) checkBillingProductCondition(ctx context.Context, company *Company, condition *Condition) (bool, error) {
