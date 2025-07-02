@@ -41,7 +41,7 @@ type Condition struct {
 	ConditionType ConditionType                  `json:"condition_type"`
 	Operator      typeconvert.ComparableOperator `json:"operator"`
 
-	// Fields relevant when ConditionType is one of Company, User, Plan, Base Plan, Billing Product, or CRM Product
+	// Fields relevant when ConditionType is one of Company, User, Plan, Base Plan, Billing Product, CRM Product, or Billing Credit
 	ResourceIDs []string `json:"resource_ids"`
 
 	// Fields relevant when ConditionType = Event
@@ -49,6 +49,10 @@ type Condition struct {
 	MetricValue            *int64                  `json:"metric_value"`
 	MetricPeriod           *MetricPeriod           `json:"metric_period"`
 	MetricPeriodMonthReset *MetricPeriodMonthReset `json:"metric_period_month_reset"`
+
+	// Fields relevant when ConditionType = Billing Credit
+	CreditID        *string  `json:"credit_id"`
+	ConsumptionRate *float64 `json:"consumption_rate"`
 
 	// Fields relevant when ConditionType = Trait
 	TraitDefinition *TraitDefinition `json:"trait_definition"`
@@ -129,6 +133,7 @@ type Company struct {
 	Keys              map[string]string       `json:"keys"`
 	PlanIDs           []string                `json:"plan_ids"`
 	Metrics           CompanyMetricCollection `json:"metrics"`
+	CreditBalances    map[string]float64      `json:"credit_balances"`
 	Subscription      *Subscription           `json:"subscription"`
 	Traits            []*Trait                `json:"traits"`
 	mu                sync.Mutex              `json:"-"` // mutex for thread safety
