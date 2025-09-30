@@ -262,6 +262,268 @@ func TestCheckFlag(t *testing.T) {
 		})
 	})
 
+	t.Run("Company-provided rules", func(t *testing.T) {
+		t.Run("Company rule is evaluated along with flag rules", func(t *testing.T) {
+			company := createTestCompany()
+			flag := createTestFlag()
+			flag.DefaultValue = false
+
+			// Create a company-provided rule that matches
+			companyRule := createTestRule()
+			companyRule.Value = true
+			condition := createTestCondition(rulesengine.ConditionTypeCompany)
+			condition.ResourceIDs = []string{company.ID}
+			companyRule.Conditions = append(companyRule.Conditions, condition)
+
+			company.Rules = []*rulesengine.Rule{companyRule}
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag)
+
+			assert.NoError(t, err)
+			assert.True(t, result.Value)
+			assert.Equal(t, &companyRule.ID, result.RuleID)
+		})
+
+		t.Run("Company rule respects priority ordering", func(t *testing.T) {
+			company := createTestCompany()
+			flag := createTestFlag()
+
+			// Create flag rule with lower priority
+			flagRule := createTestRule()
+			flagRule.Priority = 2
+			flagRule.Value = false
+			condition1 := createTestCondition(rulesengine.ConditionTypeCompany)
+			condition1.ResourceIDs = []string{company.ID}
+			flagRule.Conditions = append(flagRule.Conditions, condition1)
+
+			// Create company rule with higher priority
+			companyRule := createTestRule()
+			companyRule.Priority = 1
+			companyRule.Value = true
+			condition2 := createTestCondition(rulesengine.ConditionTypeCompany)
+			condition2.ResourceIDs = []string{company.ID}
+			companyRule.Conditions = append(companyRule.Conditions, condition2)
+
+			flag.Rules = []*rulesengine.Rule{flagRule}
+			company.Rules = []*rulesengine.Rule{companyRule}
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag)
+
+			assert.NoError(t, err)
+			assert.True(t, result.Value)
+			assert.Equal(t, &companyRule.ID, result.RuleID)
+		})
+
+		t.Run("Company rule with global override type takes precedence", func(t *testing.T) {
+			company := createTestCompany()
+			flag := createTestFlag()
+
+			// Create standard flag rule
+			flagRule := createTestRule()
+			flagRule.Value = false
+			condition1 := createTestCondition(rulesengine.ConditionTypeCompany)
+			condition1.ResourceIDs = []string{company.ID}
+			flagRule.Conditions = append(flagRule.Conditions, condition1)
+
+			// Create company rule with global override
+			companyRule := createTestRule()
+			companyRule.RuleType = rulesengine.RuleTypeGlobalOverride
+			companyRule.Value = true
+
+			flag.Rules = []*rulesengine.Rule{flagRule}
+			company.Rules = []*rulesengine.Rule{companyRule}
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag)
+
+			assert.NoError(t, err)
+			assert.True(t, result.Value)
+			assert.Equal(t, &companyRule.ID, result.RuleID)
+		})
+
+		t.Run("Multiple company rules are all evaluated", func(t *testing.T) {
+			company := createTestCompany()
+			flag := createTestFlag()
+			flag.DefaultValue = false
+
+			// Create two company rules, only one matches
+			companyRule1 := createTestRule()
+			companyRule1.Priority = 1
+			companyRule1.Value = true
+			condition1 := createTestCondition(rulesengine.ConditionTypeCompany)
+			condition1.ResourceIDs = []string{"non-matching-id"}
+			companyRule1.Conditions = append(companyRule1.Conditions, condition1)
+
+			companyRule2 := createTestRule()
+			companyRule2.Priority = 2
+			companyRule2.Value = true
+			condition2 := createTestCondition(rulesengine.ConditionTypeCompany)
+			condition2.ResourceIDs = []string{company.ID}
+			companyRule2.Conditions = append(companyRule2.Conditions, condition2)
+
+			company.Rules = []*rulesengine.Rule{companyRule1, companyRule2}
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag)
+
+			assert.NoError(t, err)
+			assert.True(t, result.Value)
+			assert.Equal(t, &companyRule2.ID, result.RuleID)
+		})
+	})
+
+	t.Run("User-provided rules", func(t *testing.T) {
+		t.Run("User rule is evaluated along with flag rules", func(t *testing.T) {
+			user := createTestUser()
+			flag := createTestFlag()
+			flag.DefaultValue = false
+
+			// Create a user-provided rule that matches
+			userRule := createTestRule()
+			userRule.Value = true
+			condition := createTestCondition(rulesengine.ConditionTypeUser)
+			condition.ResourceIDs = []string{user.ID}
+			userRule.Conditions = append(userRule.Conditions, condition)
+
+			user.Rules = []*rulesengine.Rule{userRule}
+
+			result, err := rulesengine.CheckFlag(ctx, nil, user, flag)
+
+			assert.NoError(t, err)
+			assert.True(t, result.Value)
+			assert.Equal(t, &userRule.ID, result.RuleID)
+		})
+
+		t.Run("User rule respects priority ordering", func(t *testing.T) {
+			user := createTestUser()
+			flag := createTestFlag()
+
+			// Create flag rule with lower priority
+			flagRule := createTestRule()
+			flagRule.Priority = 2
+			flagRule.Value = false
+			condition1 := createTestCondition(rulesengine.ConditionTypeUser)
+			condition1.ResourceIDs = []string{user.ID}
+			flagRule.Conditions = append(flagRule.Conditions, condition1)
+
+			// Create user rule with higher priority
+			userRule := createTestRule()
+			userRule.Priority = 1
+			userRule.Value = true
+			condition2 := createTestCondition(rulesengine.ConditionTypeUser)
+			condition2.ResourceIDs = []string{user.ID}
+			userRule.Conditions = append(userRule.Conditions, condition2)
+
+			flag.Rules = []*rulesengine.Rule{flagRule}
+			user.Rules = []*rulesengine.Rule{userRule}
+
+			result, err := rulesengine.CheckFlag(ctx, nil, user, flag)
+
+			assert.NoError(t, err)
+			assert.True(t, result.Value)
+			assert.Equal(t, &userRule.ID, result.RuleID)
+		})
+
+		t.Run("User rule with global override type takes precedence", func(t *testing.T) {
+			user := createTestUser()
+			flag := createTestFlag()
+
+			// Create standard flag rule
+			flagRule := createTestRule()
+			flagRule.Value = false
+			condition1 := createTestCondition(rulesengine.ConditionTypeUser)
+			condition1.ResourceIDs = []string{user.ID}
+			flagRule.Conditions = append(flagRule.Conditions, condition1)
+
+			// Create user rule with global override
+			userRule := createTestRule()
+			userRule.RuleType = rulesengine.RuleTypeGlobalOverride
+			userRule.Value = true
+
+			flag.Rules = []*rulesengine.Rule{flagRule}
+			user.Rules = []*rulesengine.Rule{userRule}
+
+			result, err := rulesengine.CheckFlag(ctx, nil, user, flag)
+
+			assert.NoError(t, err)
+			assert.True(t, result.Value)
+			assert.Equal(t, &userRule.ID, result.RuleID)
+		})
+	})
+
+	t.Run("Combined company and user rules", func(t *testing.T) {
+		t.Run("Both company and user rules are evaluated", func(t *testing.T) {
+			company := createTestCompany()
+			user := createTestUser()
+			flag := createTestFlag()
+			flag.DefaultValue = false
+
+			// Create company rule that doesn't match
+			companyRule := createTestRule()
+			companyRule.Priority = 1
+			companyRule.Value = true
+			condition1 := createTestCondition(rulesengine.ConditionTypeCompany)
+			condition1.ResourceIDs = []string{"non-matching-id"}
+			companyRule.Conditions = append(companyRule.Conditions, condition1)
+
+			// Create user rule that matches
+			userRule := createTestRule()
+			userRule.Priority = 2
+			userRule.Value = true
+			condition2 := createTestCondition(rulesengine.ConditionTypeUser)
+			condition2.ResourceIDs = []string{user.ID}
+			userRule.Conditions = append(userRule.Conditions, condition2)
+
+			company.Rules = []*rulesengine.Rule{companyRule}
+			user.Rules = []*rulesengine.Rule{userRule}
+
+			result, err := rulesengine.CheckFlag(ctx, company, user, flag)
+
+			assert.NoError(t, err)
+			assert.True(t, result.Value)
+			assert.Equal(t, &userRule.ID, result.RuleID)
+		})
+
+		t.Run("All three rule sources evaluated with correct priority", func(t *testing.T) {
+			company := createTestCompany()
+			user := createTestUser()
+			flag := createTestFlag()
+			flag.DefaultValue = false
+
+			// Create rules from all three sources - all matching their respective conditions
+			flagRule := createTestRule()
+			flagRule.Priority = 2
+			flagRule.Value = true
+			condition1 := createTestCondition(rulesengine.ConditionTypeCompany)
+			condition1.ResourceIDs = []string{company.ID}
+			flagRule.Conditions = append(flagRule.Conditions, condition1)
+
+			companyRule := createTestRule()
+			companyRule.Priority = 3
+			companyRule.Value = true
+			condition2 := createTestCondition(rulesengine.ConditionTypeCompany)
+			condition2.ResourceIDs = []string{company.ID}
+			companyRule.Conditions = append(companyRule.Conditions, condition2)
+
+			userRule := createTestRule()
+			userRule.Priority = 1 // Highest priority
+			userRule.Value = true
+			condition3 := createTestCondition(rulesengine.ConditionTypeUser)
+			condition3.ResourceIDs = []string{user.ID}
+			userRule.Conditions = append(userRule.Conditions, condition3)
+
+			flag.Rules = []*rulesengine.Rule{flagRule}
+			company.Rules = []*rulesengine.Rule{companyRule}
+			user.Rules = []*rulesengine.Rule{userRule}
+
+			result, err := rulesengine.CheckFlag(ctx, company, user, flag)
+
+			assert.NoError(t, err)
+			assert.True(t, result.Value)
+			assert.NotNil(t, result.RuleID)
+			// Should match the user rule since it has highest priority (lowest number)
+			assert.Equal(t, &userRule.ID, result.RuleID)
+		})
+	})
+
 	t.Run("Complex scenarios", func(t *testing.T) {
 		t.Run("Handles multiple condition types and groups", func(t *testing.T) {
 			company := createTestCompany()

@@ -132,7 +132,14 @@ func CheckFlag(
 	}
 
 	ruleChecker := NewRuleCheckService()
-	for _, group := range GroupRulesByPriority(flag.Rules) {
+	var companyRules, userRules []*Rule
+	if company != nil {
+		companyRules = company.Rules
+	}
+	if user != nil {
+		userRules = user.Rules
+	}
+	for _, group := range GroupRulesByPriority(flag.Rules, companyRules, userRules) {
 		for _, rule := range group {
 			if rule == nil {
 				continue
@@ -166,9 +173,14 @@ func CheckFlag(
 }
 
 // Given a list of rules, group by type, then sort each group as appropriate to the type
-func GroupRulesByPriority(rules []*Rule) [][]*Rule {
+func GroupRulesByPriority(ruleSlices ...[]*Rule) [][]*Rule {
+	allRules := []*Rule{}
+	for _, rules := range ruleSlices {
+		allRules = append(allRules, rules...)
+	}
+
 	// Group rules by their type
-	grouped := groupBy(rules, func(rule *Rule) RuleType {
+	grouped := groupBy(allRules, func(rule *Rule) RuleType {
 		return rule.RuleType
 	})
 
