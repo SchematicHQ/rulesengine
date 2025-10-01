@@ -134,10 +134,18 @@ func CheckFlag(
 	ruleChecker := NewRuleCheckService()
 	var companyRules, userRules []*Rule
 	if company != nil {
-		companyRules = company.Rules
+		for _, rule := range company.Rules {
+			if rule != nil && rule.FlagID != nil && *rule.FlagID == flag.ID {
+				companyRules = append(companyRules, rule)
+			}
+		}
 	}
 	if user != nil {
-		userRules = user.Rules
+		for _, rule := range user.Rules {
+			if rule != nil && rule.FlagID != nil && *rule.FlagID == flag.ID {
+				userRules = append(userRules, rule)
+			}
+		}
 	}
 	for _, group := range GroupRulesByPriority(flag.Rules, companyRules, userRules) {
 		for _, rule := range group {

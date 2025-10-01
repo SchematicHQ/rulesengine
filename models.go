@@ -24,6 +24,7 @@ type Flag struct {
 
 type Rule struct {
 	ID              string            `json:"id"`
+	FlagID          *string           `json:"flag_id"`
 	AccountID       string            `json:"account_id"`
 	EnvironmentID   string            `json:"environment_id"`
 	RuleType        RuleType          `json:"rule_type"`

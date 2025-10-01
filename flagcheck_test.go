@@ -270,6 +270,7 @@ func TestCheckFlag(t *testing.T) {
 
 			// Create a company-provided rule that matches
 			companyRule := createTestRule()
+			companyRule.FlagID = &flag.ID
 			companyRule.Value = true
 			condition := createTestCondition(rulesengine.ConditionTypeCompany)
 			condition.ResourceIDs = []string{company.ID}
@@ -298,6 +299,7 @@ func TestCheckFlag(t *testing.T) {
 
 			// Create company rule with higher priority
 			companyRule := createTestRule()
+			companyRule.FlagID = &flag.ID
 			companyRule.Priority = 1
 			companyRule.Value = true
 			condition2 := createTestCondition(rulesengine.ConditionTypeCompany)
@@ -327,6 +329,7 @@ func TestCheckFlag(t *testing.T) {
 
 			// Create company rule with global override
 			companyRule := createTestRule()
+			companyRule.FlagID = &flag.ID
 			companyRule.RuleType = rulesengine.RuleTypeGlobalOverride
 			companyRule.Value = true
 
@@ -347,6 +350,7 @@ func TestCheckFlag(t *testing.T) {
 
 			// Create two company rules, only one matches
 			companyRule1 := createTestRule()
+			companyRule1.FlagID = &flag.ID
 			companyRule1.Priority = 1
 			companyRule1.Value = true
 			condition1 := createTestCondition(rulesengine.ConditionTypeCompany)
@@ -354,6 +358,7 @@ func TestCheckFlag(t *testing.T) {
 			companyRule1.Conditions = append(companyRule1.Conditions, condition1)
 
 			companyRule2 := createTestRule()
+			companyRule2.FlagID = &flag.ID
 			companyRule2.Priority = 2
 			companyRule2.Value = true
 			condition2 := createTestCondition(rulesengine.ConditionTypeCompany)
@@ -378,6 +383,7 @@ func TestCheckFlag(t *testing.T) {
 
 			// Create a user-provided rule that matches
 			userRule := createTestRule()
+			userRule.FlagID = &flag.ID
 			userRule.Value = true
 			condition := createTestCondition(rulesengine.ConditionTypeUser)
 			condition.ResourceIDs = []string{user.ID}
@@ -406,6 +412,7 @@ func TestCheckFlag(t *testing.T) {
 
 			// Create user rule with higher priority
 			userRule := createTestRule()
+			userRule.FlagID = &flag.ID
 			userRule.Priority = 1
 			userRule.Value = true
 			condition2 := createTestCondition(rulesengine.ConditionTypeUser)
@@ -435,6 +442,7 @@ func TestCheckFlag(t *testing.T) {
 
 			// Create user rule with global override
 			userRule := createTestRule()
+			userRule.FlagID = &flag.ID
 			userRule.RuleType = rulesengine.RuleTypeGlobalOverride
 			userRule.Value = true
 
@@ -458,6 +466,7 @@ func TestCheckFlag(t *testing.T) {
 
 			// Create company rule that doesn't match
 			companyRule := createTestRule()
+			companyRule.FlagID = &flag.ID
 			companyRule.Priority = 1
 			companyRule.Value = true
 			condition1 := createTestCondition(rulesengine.ConditionTypeCompany)
@@ -466,6 +475,7 @@ func TestCheckFlag(t *testing.T) {
 
 			// Create user rule that matches
 			userRule := createTestRule()
+			userRule.FlagID = &flag.ID
 			userRule.Priority = 2
 			userRule.Value = true
 			condition2 := createTestCondition(rulesengine.ConditionTypeUser)
@@ -497,6 +507,7 @@ func TestCheckFlag(t *testing.T) {
 			flagRule.Conditions = append(flagRule.Conditions, condition1)
 
 			companyRule := createTestRule()
+			companyRule.FlagID = &flag.ID
 			companyRule.Priority = 3
 			companyRule.Value = true
 			condition2 := createTestCondition(rulesengine.ConditionTypeCompany)
@@ -504,6 +515,7 @@ func TestCheckFlag(t *testing.T) {
 			companyRule.Conditions = append(companyRule.Conditions, condition2)
 
 			userRule := createTestRule()
+			userRule.FlagID = &flag.ID
 			userRule.Priority = 1 // Highest priority
 			userRule.Value = true
 			condition3 := createTestCondition(rulesengine.ConditionTypeUser)
@@ -521,6 +533,117 @@ func TestCheckFlag(t *testing.T) {
 			assert.NotNil(t, result.RuleID)
 			// Should match the user rule since it has highest priority (lowest number)
 			assert.Equal(t, &userRule.ID, result.RuleID)
+		})
+
+		t.Run("Company rules for different flag are not evaluated", func(t *testing.T) {
+			company := createTestCompany()
+			flag := createTestFlag()
+			flag.DefaultValue = false
+
+			otherFlagID := "other-flag-id"
+
+			// Create a company rule for a different flag
+			companyRuleForOtherFlag := createTestRule()
+			companyRuleForOtherFlag.FlagID = &otherFlagID
+			companyRuleForOtherFlag.Value = true
+			condition := createTestCondition(rulesengine.ConditionTypeCompany)
+			condition.ResourceIDs = []string{company.ID}
+			companyRuleForOtherFlag.Conditions = append(companyRuleForOtherFlag.Conditions, condition)
+
+			company.Rules = []*rulesengine.Rule{companyRuleForOtherFlag}
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag)
+
+			assert.NoError(t, err)
+			// Should use default value since the company rule is for a different flag
+			assert.False(t, result.Value)
+			assert.Nil(t, result.RuleID)
+			assert.Equal(t, rulesengine.ReasonNoRulesMatched, result.Reason)
+		})
+
+		t.Run("User rules for different flag are not evaluated", func(t *testing.T) {
+			user := createTestUser()
+			flag := createTestFlag()
+			flag.DefaultValue = false
+
+			otherFlagID := "other-flag-id"
+
+			// Create a user rule for a different flag
+			userRuleForOtherFlag := createTestRule()
+			userRuleForOtherFlag.FlagID = &otherFlagID
+			userRuleForOtherFlag.Value = true
+			condition := createTestCondition(rulesengine.ConditionTypeUser)
+			condition.ResourceIDs = []string{user.ID}
+			userRuleForOtherFlag.Conditions = append(userRuleForOtherFlag.Conditions, condition)
+
+			user.Rules = []*rulesengine.Rule{userRuleForOtherFlag}
+
+			result, err := rulesengine.CheckFlag(ctx, nil, user, flag)
+
+			assert.NoError(t, err)
+			// Should use default value since the user rule is for a different flag
+			assert.False(t, result.Value)
+			assert.Nil(t, result.RuleID)
+			assert.Equal(t, rulesengine.ReasonNoRulesMatched, result.Reason)
+		})
+
+		t.Run("Rules with nil FlagID are not evaluated", func(t *testing.T) {
+			company := createTestCompany()
+			flag := createTestFlag()
+			flag.DefaultValue = false
+
+			// Create a company rule with nil FlagID (legacy rule before FlagID was added)
+			companyRuleWithoutFlagID := createTestRule()
+			companyRuleWithoutFlagID.FlagID = nil
+			companyRuleWithoutFlagID.Value = true
+			condition := createTestCondition(rulesengine.ConditionTypeCompany)
+			condition.ResourceIDs = []string{company.ID}
+			companyRuleWithoutFlagID.Conditions = append(companyRuleWithoutFlagID.Conditions, condition)
+
+			company.Rules = []*rulesengine.Rule{companyRuleWithoutFlagID}
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag)
+
+			assert.NoError(t, err)
+			// Should use default value since the company rule has nil FlagID
+			assert.False(t, result.Value)
+			assert.Nil(t, result.RuleID)
+			assert.Equal(t, rulesengine.ReasonNoRulesMatched, result.Reason)
+		})
+
+		t.Run("Correct flag rule is selected when company has multiple flag rules", func(t *testing.T) {
+			company := createTestCompany()
+			flag1 := createTestFlag()
+			flag2 := createTestFlag()
+
+			// Create rules for two different flags
+			ruleForFlag1 := createTestRule()
+			ruleForFlag1.FlagID = &flag1.ID
+			ruleForFlag1.Value = true
+			condition1 := createTestCondition(rulesengine.ConditionTypeCompany)
+			condition1.ResourceIDs = []string{company.ID}
+			ruleForFlag1.Conditions = append(ruleForFlag1.Conditions, condition1)
+
+			ruleForFlag2 := createTestRule()
+			ruleForFlag2.FlagID = &flag2.ID
+			ruleForFlag2.Value = false
+			condition2 := createTestCondition(rulesengine.ConditionTypeCompany)
+			condition2.ResourceIDs = []string{company.ID}
+			ruleForFlag2.Conditions = append(ruleForFlag2.Conditions, condition2)
+
+			company.Rules = []*rulesengine.Rule{ruleForFlag1, ruleForFlag2}
+
+			// Check flag1 - should use ruleForFlag1
+			result1, err := rulesengine.CheckFlag(ctx, company, nil, flag1)
+			assert.NoError(t, err)
+			assert.True(t, result1.Value)
+			assert.Equal(t, &ruleForFlag1.ID, result1.RuleID)
+
+			// Check flag2 - should use ruleForFlag2
+			result2, err := rulesengine.CheckFlag(ctx, company, nil, flag2)
+			assert.NoError(t, err)
+			assert.False(t, result2.Value)
+			assert.Equal(t, &ruleForFlag2.ID, result2.RuleID)
 		})
 	})
 
