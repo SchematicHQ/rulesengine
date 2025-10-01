@@ -24,6 +24,7 @@ type Flag struct {
 
 type Rule struct {
 	ID              string            `json:"id"`
+	FlagID          *string           `json:"flag_id"`
 	AccountID       string            `json:"account_id"`
 	EnvironmentID   string            `json:"environment_id"`
 	RuleType        RuleType          `json:"rule_type"`
@@ -136,6 +137,7 @@ type Company struct {
 	CreditBalances    map[string]float64      `json:"credit_balances"`
 	Subscription      *Subscription           `json:"subscription"`
 	Traits            []*Trait                `json:"traits"`
+	Rules             []*Rule                 `json:"rules"`
 	mu                sync.Mutex              `json:"-"` // mutex for thread safety
 }
 
@@ -195,4 +197,5 @@ type User struct {
 
 	Keys   map[string]string `json:"keys"`
 	Traits []*Trait          `json:"traits"`
+	Rules  []*Rule           `json:"rules"`
 }
