@@ -9,8 +9,8 @@ import (
 
 type TraitDefinition struct {
 	ID             string                     `json:"id"`
-	ComparableType typeconvert.ComparableType `json:"comparable_type"`
-	EntityType     EntityType                 `json:"entity_type"`
+	ComparableType typeconvert.ComparableType `json:"comparable_type" binding:"oneof=bool date int string"`
+	EntityType     EntityType                 `json:"entity_type" binding:"oneof=user company"`
 }
 
 type Flag struct {
@@ -27,7 +27,7 @@ type Rule struct {
 	FlagID          *string           `json:"flag_id"`
 	AccountID       string            `json:"account_id"`
 	EnvironmentID   string            `json:"environment_id"`
-	RuleType        RuleType          `json:"rule_type"`
+	RuleType        RuleType          `json:"rule_type" binding:"oneof=default global_override company_override company_override_usage_exceeded plan_entitlement plan_entitlement_usage_exceeded standard"`
 	Name            string            `json:"name"`
 	Priority        int64             `json:"priority"`
 	Conditions      []*Condition      `json:"conditions"`
@@ -39,8 +39,8 @@ type Condition struct {
 	ID            string                         `json:"id"`
 	AccountID     string                         `json:"account_id"`
 	EnvironmentID string                         `json:"environment_id"`
-	ConditionType ConditionType                  `json:"condition_type"`
-	Operator      typeconvert.ComparableOperator `json:"operator"`
+	ConditionType ConditionType                  `json:"condition_type" binding:"oneof=base_plan billing_product company credit crm_product metric plan trait user"`
+	Operator      typeconvert.ComparableOperator `json:"operator" binding:"oneof=eq ne gt lt gte lte is_empty not_empty"`
 
 	// Fields relevant when ConditionType is one of Company, User, Plan, Base Plan, Billing Product, CRM Product, or Billing Credit
 	ResourceIDs []string `json:"resource_ids"`
@@ -48,8 +48,8 @@ type Condition struct {
 	// Fields relevant when ConditionType = Event
 	EventSubtype           *string                 `json:"event_subtype"`
 	MetricValue            *int64                  `json:"metric_value"`
-	MetricPeriod           *MetricPeriod           `json:"metric_period"`
-	MetricPeriodMonthReset *MetricPeriodMonthReset `json:"metric_period_month_reset"`
+	MetricPeriod           *MetricPeriod           `json:"metric_period" binding:"oneof=all_time current_day current_month current_week"`
+	MetricPeriodMonthReset *MetricPeriodMonthReset `json:"metric_period_month_reset" binding:"oneof=first_of_month billing_cycle"`
 
 	// Fields relevant when ConditionType = Billing Credit
 	CreditID        *string  `json:"credit_id"`
@@ -74,8 +74,8 @@ type CompanyMetric struct {
 	EnvironmentID string                 `json:"environment_id"`
 	CompanyID     string                 `json:"company_id"`
 	EventSubtype  string                 `json:"event_subtype"`
-	Period        MetricPeriod           `json:"period"`
-	MonthReset    MetricPeriodMonthReset `json:"month_reset"`
+	Period        MetricPeriod           `json:"period" binding:"oneof=all_time current_day current_month current_week"`
+	MonthReset    MetricPeriodMonthReset `json:"month_reset" binding:"oneof=first_of_month billing_cycle"`
 	Value         int64                  `json:"value"`
 	CreatedAt     time.Time              `json:"created_at"`
 	ValidUntil    *time.Time             `json:"valid_until"`

@@ -44,8 +44,6 @@ const (
 	RuleTypePlanEntitlementUsageExceeded RuleType = "plan_entitlement_usage_exceeded"
 	RuleTypeStandard                     RuleType = "standard" // Any other rule type
 	RuleTypeDefault                      RuleType = "default"  // Default on/off toggle; will not have any conditions, only a value
-
-	RuleTypePlanAudience RuleType = "plan_audience" // Plan audience rule; should have a plan_id but no flag_id
 )
 
 type RulePrioritizationMethod string
