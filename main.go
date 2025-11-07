@@ -10,9 +10,10 @@ import (
 )
 
 type WasmInput struct {
-	Company Company `json:"company"`
-	User    User    `json:"user"`
-	Flag    Flag    `json:"flag"`
+	Company  Company `json:"company"`
+	User     User    `json:"user"`
+	Flag     Flag    `json:"flag"`
+	Quantity *int64  `json:"quantity,omitempty"`
 }
 
 type WasmOutput struct {
@@ -26,7 +27,12 @@ func checkFlag(this js.Value, args []js.Value) interface{} {
 	var wasmInput WasmInput
 	json.Unmarshal([]byte(input), &wasmInput)
 
-	result, err := CheckFlag(context.Background(), &wasmInput.Company, &wasmInput.User, &wasmInput.Flag)
+	var opts []CheckFlagOption
+	if wasmInput.Quantity != nil {
+		opts = append(opts, WithQuantity(*wasmInput.Quantity))
+	}
+
+	result, err := CheckFlag(context.Background(), &wasmInput.Company, &wasmInput.User, &wasmInput.Flag, opts...)
 
 	output := WasmOutput{
 		Result: result,

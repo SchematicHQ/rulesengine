@@ -36,6 +36,18 @@ const (
 	ReasonUserNotFound        = "User not found"
 )
 
+type CheckFlagOption func(*checkFlagOptions)
+
+type checkFlagOptions struct {
+	quantity *int64
+}
+
+func WithQuantity(q int64) CheckFlagOption {
+	return func(o *checkFlagOptions) {
+		o.quantity = &q
+	}
+}
+
 func (r *CheckFlagResult) setRuleFields(company *Company, rule *Rule) {
 	if rule == nil {
 		return
@@ -111,7 +123,13 @@ func CheckFlag(
 	company *Company,
 	user *User,
 	flag *Flag,
+	opts ...CheckFlagOption,
 ) (*CheckFlagResult, error) {
+	options := &checkFlagOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
 	resp := &CheckFlagResult{Reason: ReasonNoRulesMatched}
 
 	if flag == nil {
@@ -154,9 +172,10 @@ func CheckFlag(
 			}
 
 			checkRuleResp, err := ruleChecker.Check(ctx, &CheckScope{
-				Company: company,
-				Rule:    rule,
-				User:    user,
+				Company:  company,
+				Rule:     rule,
+				User:     user,
+				Quantity: options.quantity,
 			})
 			if err != nil {
 				resp.Err = err

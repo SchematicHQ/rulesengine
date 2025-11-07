@@ -436,5 +436,313 @@ func TestRuleCheckService(t *testing.T) {
 			assert.NoError(t, err)
 			assert.False(t, result.Match, "Rule should not match with non-matching condition")
 		})
+
+		t.Run("Credit burndown with usage tracking - sufficient credits", func(t *testing.T) {
+			svc := rulesengine.NewRuleCheckService()
+			company := createTestCompany()
+
+			creditID := "test-credit-id"
+			eventSubtype := "api-calls"
+
+			company.CreditBalances = map[string]float64{
+				creditID: 20.0,
+			}
+
+			metric := createTestMetric(company, eventSubtype, rulesengine.MetricPeriodAllTime, 24)
+			company.Metrics = append(company.Metrics, metric)
+
+			rule := createTestRule()
+			condition := createTestCondition(rulesengine.ConditionTypeCredit)
+			condition.CreditID = &creditID
+			condition.EventSubtype = &eventSubtype
+			condition.ConsumptionRate = null.Nullable(0.0001)
+
+			rule.Conditions = []*rulesengine.Condition{condition}
+
+			result, err := svc.Check(ctx, &rulesengine.CheckScope{
+				Company: company,
+				Rule:    rule,
+			})
+
+			assert.NoError(t, err)
+			assert.True(t, result.Match, "Should have enough credits for the usage (20 >= 0.0024)")
+		})
+
+		t.Run("Credit burndown with usage tracking - insufficient credits", func(t *testing.T) {
+			svc := rulesengine.NewRuleCheckService()
+			company := createTestCompany()
+
+			creditID := "test-credit-id"
+			eventSubtype := "api-calls"
+
+			company.CreditBalances = map[string]float64{
+				creditID: 5.0,
+			}
+
+			metric := createTestMetric(company, eventSubtype, rulesengine.MetricPeriodAllTime, 100)
+			company.Metrics = append(company.Metrics, metric)
+
+			rule := createTestRule()
+			condition := createTestCondition(rulesengine.ConditionTypeCredit)
+			condition.CreditID = &creditID
+			condition.EventSubtype = &eventSubtype
+			condition.ConsumptionRate = null.Nullable(0.1)
+
+			rule.Conditions = []*rulesengine.Condition{condition}
+
+			result, err := svc.Check(ctx, &rulesengine.CheckScope{
+				Company: company,
+				Rule:    rule,
+			})
+
+			assert.NoError(t, err)
+			assert.False(t, result.Match, "Should NOT have enough credits for the usage (5 < 10)")
+		})
+
+		t.Run("Credit burndown with zero usage", func(t *testing.T) {
+			svc := rulesengine.NewRuleCheckService()
+			company := createTestCompany()
+
+			creditID := "test-credit-id"
+			eventSubtype := "api-calls"
+
+			company.CreditBalances = map[string]float64{
+				creditID: 100.0,
+			}
+
+			rule := createTestRule()
+			condition := createTestCondition(rulesengine.ConditionTypeCredit)
+			condition.CreditID = &creditID
+			condition.EventSubtype = &eventSubtype
+			condition.ConsumptionRate = null.Nullable(0.5)
+
+			rule.Conditions = []*rulesengine.Condition{condition}
+
+			result, err := svc.Check(ctx, &rulesengine.CheckScope{
+				Company: company,
+				Rule:    rule,
+			})
+
+			assert.NoError(t, err)
+			assert.True(t, result.Match, "Should pass with zero usage (0 × 0.5 = 0 credits needed)")
+		})
+
+		t.Run("Credit burndown with zero consumption rate", func(t *testing.T) {
+			svc := rulesengine.NewRuleCheckService()
+			company := createTestCompany()
+
+			creditID := "test-credit-id"
+			eventSubtype := "api-calls"
+
+			company.CreditBalances = map[string]float64{
+				creditID: 100.0,
+			}
+
+			metric := createTestMetric(company, eventSubtype, rulesengine.MetricPeriodAllTime, 10)
+			company.Metrics = append(company.Metrics, metric)
+
+			rule := createTestRule()
+			condition := createTestCondition(rulesengine.ConditionTypeCredit)
+			condition.CreditID = &creditID
+			condition.EventSubtype = &eventSubtype
+			condition.ConsumptionRate = null.Nullable(0.0)
+
+			rule.Conditions = []*rulesengine.Condition{condition}
+
+			result, err := svc.Check(ctx, &rulesengine.CheckScope{
+				Company: company,
+				Rule:    rule,
+			})
+
+			assert.NoError(t, err)
+			assert.True(t, result.Match, "Should pass with zero consumption rate (10 × 0 = 0 credits needed)")
+		})
+
+		t.Run("Quantity-based credit check - sufficient credits", func(t *testing.T) {
+			svc := rulesengine.NewRuleCheckService()
+			company := createTestCompany()
+
+			creditID := "test-credit-id"
+			company.CreditBalances = map[string]float64{
+				creditID: 100.0,
+			}
+
+			rule := createTestRule()
+			condition := createTestCondition(rulesengine.ConditionTypeCredit)
+			condition.CreditID = &creditID
+			condition.ConsumptionRate = null.Nullable(2.0)
+
+			rule.Conditions = []*rulesengine.Condition{condition}
+
+			quantity := int64(30)
+			result, err := svc.Check(ctx, &rulesengine.CheckScope{
+				Company:  company,
+				Rule:     rule,
+				Quantity: &quantity,
+			})
+
+			assert.NoError(t, err)
+			assert.True(t, result.Match, "Should have enough credits for quantity (100 >= 30 × 2 = 60)")
+		})
+
+		t.Run("Quantity-based credit check - insufficient credits", func(t *testing.T) {
+			svc := rulesengine.NewRuleCheckService()
+			company := createTestCompany()
+
+			creditID := "test-credit-id"
+			company.CreditBalances = map[string]float64{
+				creditID: 50.0,
+			}
+
+			rule := createTestRule()
+			condition := createTestCondition(rulesengine.ConditionTypeCredit)
+			condition.CreditID = &creditID
+			condition.ConsumptionRate = null.Nullable(2.0)
+
+			rule.Conditions = []*rulesengine.Condition{condition}
+
+			quantity := int64(30)
+			result, err := svc.Check(ctx, &rulesengine.CheckScope{
+				Company:  company,
+				Rule:     rule,
+				Quantity: &quantity,
+			})
+
+			assert.NoError(t, err)
+			assert.False(t, result.Match, "Should NOT have enough credits for quantity (50 < 30 × 2 = 60)")
+		})
+
+		t.Run("Quantity-based credit check with fractional consumption rate", func(t *testing.T) {
+			svc := rulesengine.NewRuleCheckService()
+			company := createTestCompany()
+
+			creditID := "test-credit-id"
+			company.CreditBalances = map[string]float64{
+				creditID: 10.0,
+			}
+
+			rule := createTestRule()
+			condition := createTestCondition(rulesengine.ConditionTypeCredit)
+			condition.CreditID = &creditID
+			condition.ConsumptionRate = null.Nullable(0.01)
+
+			rule.Conditions = []*rulesengine.Condition{condition}
+
+			quantity := int64(500)
+			result, err := svc.Check(ctx, &rulesengine.CheckScope{
+				Company:  company,
+				Rule:     rule,
+				Quantity: &quantity,
+			})
+
+			assert.NoError(t, err)
+			assert.True(t, result.Match, "Should have enough credits for quantity (10 >= 500 × 0.01 = 5)")
+		})
+	})
+
+	t.Run("Metric evaluation with quantity", func(t *testing.T) {
+		t.Run("Quantity-based metric check - within limit", func(t *testing.T) {
+			svc := rulesengine.NewRuleCheckService()
+			company := createTestCompany()
+
+			eventSubtype := "api-calls"
+			rule := createTestRule()
+			condition := createTestCondition(rulesengine.ConditionTypeMetric)
+			condition.EventSubtype = &eventSubtype
+			metricValue := int64(100)
+			condition.MetricValue = &metricValue
+			condition.Operator = typeconvert.ComparableOperatorLte
+			rule.Conditions = []*rulesengine.Condition{condition}
+
+			metric := createTestMetric(company, eventSubtype, *condition.MetricPeriod, 50)
+			company.Metrics = append(company.Metrics, metric)
+
+			quantity := int64(30)
+			result, err := svc.Check(ctx, &rulesengine.CheckScope{
+				Company:  company,
+				Rule:     rule,
+				Quantity: &quantity,
+			})
+
+			assert.NoError(t, err)
+			assert.True(t, result.Match, "Should be within limit (50 + 30 = 80 <= 100)")
+		})
+
+		t.Run("Quantity-based metric check - exceeds limit", func(t *testing.T) {
+			svc := rulesengine.NewRuleCheckService()
+			company := createTestCompany()
+
+			eventSubtype := "api-calls"
+			rule := createTestRule()
+			condition := createTestCondition(rulesengine.ConditionTypeMetric)
+			condition.EventSubtype = &eventSubtype
+			metricValue := int64(100)
+			condition.MetricValue = &metricValue
+			condition.Operator = typeconvert.ComparableOperatorLte
+			rule.Conditions = []*rulesengine.Condition{condition}
+
+			metric := createTestMetric(company, eventSubtype, *condition.MetricPeriod, 80)
+			company.Metrics = append(company.Metrics, metric)
+
+			quantity := int64(30)
+			result, err := svc.Check(ctx, &rulesengine.CheckScope{
+				Company:  company,
+				Rule:     rule,
+				Quantity: &quantity,
+			})
+
+			assert.NoError(t, err)
+			assert.False(t, result.Match, "Should exceed limit (80 + 30 = 110 > 100)")
+		})
+
+		t.Run("Quantity-based metric check - exactly at limit", func(t *testing.T) {
+			svc := rulesengine.NewRuleCheckService()
+			company := createTestCompany()
+
+			eventSubtype := "api-calls"
+			rule := createTestRule()
+			condition := createTestCondition(rulesengine.ConditionTypeMetric)
+			condition.EventSubtype = &eventSubtype
+			metricValue := int64(100)
+			condition.MetricValue = &metricValue
+			condition.Operator = typeconvert.ComparableOperatorLte
+			rule.Conditions = []*rulesengine.Condition{condition}
+
+			metric := createTestMetric(company, eventSubtype, *condition.MetricPeriod, 70)
+			company.Metrics = append(company.Metrics, metric)
+
+			quantity := int64(30)
+			result, err := svc.Check(ctx, &rulesengine.CheckScope{
+				Company:  company,
+				Rule:     rule,
+				Quantity: &quantity,
+			})
+
+			assert.NoError(t, err)
+			assert.True(t, result.Match, "Should be exactly at limit (70 + 30 = 100 <= 100)")
+		})
+
+		t.Run("Quantity-based metric check - no current usage", func(t *testing.T) {
+			svc := rulesengine.NewRuleCheckService()
+			company := createTestCompany()
+
+			eventSubtype := "api-calls"
+			rule := createTestRule()
+			condition := createTestCondition(rulesengine.ConditionTypeMetric)
+			condition.EventSubtype = &eventSubtype
+			metricValue := int64(100)
+			condition.MetricValue = &metricValue
+			condition.Operator = typeconvert.ComparableOperatorLte
+			rule.Conditions = []*rulesengine.Condition{condition}
+
+			result, err := svc.Check(ctx, &rulesengine.CheckScope{
+				Company:  company,
+				Rule:     rule,
+				Quantity: &quantity,
+			})
+
+			assert.NoError(t, err)
+			assert.True(t, result.Match, "Should be within limit (0 + 50 = 50 <= 100)")
+		})
 	})
 }
