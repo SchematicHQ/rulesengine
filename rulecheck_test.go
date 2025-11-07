@@ -624,11 +624,11 @@ func TestRuleCheckService(t *testing.T) {
 			rule := createTestRule()
 			condition := createTestCondition(rulesengine.ConditionTypeCredit)
 			condition.CreditID = &creditID
-			condition.ConsumptionRate = null.Nullable(0.01)
+			condition.ConsumptionRate = null.Nullable(0.01) // 0.01 credits per unit
 
 			rule.Conditions = []*rulesengine.Condition{condition}
 
-			quantity := int64(500)
+			quantity := int64(500) // Want to consume 500 units
 			result, err := svc.Check(ctx, &rulesengine.CheckScope{
 				Company:  company,
 				Rule:     rule,
@@ -649,7 +649,7 @@ func TestRuleCheckService(t *testing.T) {
 			rule := createTestRule()
 			condition := createTestCondition(rulesengine.ConditionTypeMetric)
 			condition.EventSubtype = &eventSubtype
-			metricValue := int64(100)
+			metricValue := int64(100) // Limit is 100
 			condition.MetricValue = &metricValue
 			condition.Operator = typeconvert.ComparableOperatorLte
 			rule.Conditions = []*rulesengine.Condition{condition}
@@ -676,7 +676,7 @@ func TestRuleCheckService(t *testing.T) {
 			rule := createTestRule()
 			condition := createTestCondition(rulesengine.ConditionTypeMetric)
 			condition.EventSubtype = &eventSubtype
-			metricValue := int64(100)
+			metricValue := int64(100) // Limit is 100
 			condition.MetricValue = &metricValue
 			condition.Operator = typeconvert.ComparableOperatorLte
 			rule.Conditions = []*rulesengine.Condition{condition}
@@ -738,7 +738,7 @@ func TestRuleCheckService(t *testing.T) {
 			result, err := svc.Check(ctx, &rulesengine.CheckScope{
 				Company:  company,
 				Rule:     rule,
-				Quantity: &quantity,
+				Quantity: null.Nullable(int64(50)),
 			})
 
 			assert.NoError(t, err)
