@@ -10,20 +10,20 @@ import (
 )
 
 type CheckFlagResult struct {
-	CompanyID           *string
-	Err                 error
-	FeatureAllocation   *int64
-	FeatureUsage        *int64
-	FeatureUsageEvent   *string
-	FeatureUsagePeriod  *MetricPeriod
-	FeatureUsageResetAt *time.Time
-	FlagID              *string
-	FlagKey             string
-	Reason              string
-	RuleID              *string
-	RuleType            *RuleType
-	UserID              *string
-	Value               bool
+	CompanyID           *string       `json:"company_id,omitempty"`
+	Err                 error         `json:"err,omitempty"`
+	FeatureAllocation   *int64        `json:"feature_allocation,omitempty"`
+	FeatureUsage        *int64        `json:"feature_usage,omitempty"`
+	FeatureUsageEvent   *string       `json:"feature_usage_event,omitempty"`
+	FeatureUsagePeriod  *MetricPeriod `json:"feature_usage_period,omitempty" binding:"oneof=all_time current_day current_month current_week"`
+	FeatureUsageResetAt *time.Time    `json:"feature_usage_reset_at,omitempty"`
+	FlagID              *string       `json:"flag_id,omitempty"`
+	FlagKey             string        `json:"flag_key"`
+	Reason              string        `json:"reason"`
+	RuleID              *string       `json:"rule_id,omitempty"`
+	RuleType            *RuleType     `json:"rule_type,omitempty" binding:"oneof=default global_override company_override company_override_usage_exceeded plan_entitlement plan_entitlement_usage_exceeded standard"`
+	UserID              *string       `json:"user_id,omitempty"`
+	Value               bool          `json:"value"`
 }
 
 const (
