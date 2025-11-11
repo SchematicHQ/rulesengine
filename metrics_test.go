@@ -178,13 +178,7 @@ func TestGetCurrentMetricPeriodStartForCompanyBillingSubscription(t *testing.T) 
 		company := createTestCompany()
 
 		// Set a recent subscription start date (10 days ago)
-		company.Subscription.PeriodStart = time.Date(
-			now.Year(),
-			now.Month(),
-			now.Day()-10,
-			12, 0, 0, 0,
-			time.UTC,
-		)
+		company.Subscription.PeriodStart = now.AddDate(0, 0, -10).Truncate(time.Hour).Add(12 * time.Hour)
 
 		// Set the subscription to have started recently, so any computed reset date
 		// that's earlier than 10 days ago should be replaced with the period start
