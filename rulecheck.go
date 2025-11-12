@@ -9,9 +9,11 @@ import (
 )
 
 type CheckScope struct {
-	Company *Company
-	Rule    *Rule
-	User    *User
+	Company    *Company
+	Rule       *Rule
+	User       *User
+	Usage      *int64
+	EventUsage map[string]int64
 }
 
 type CheckResult struct {
@@ -42,14 +44,14 @@ func (s *RuleCheckService) Check(ctx context.Context, scope *CheckScope) (res *C
 
 	var match bool
 	for _, condition := range scope.Rule.Conditions {
-		match, err = s.checkCondition(ctx, scope.Company, scope.User, condition)
+		match, err = s.checkCondition(ctx, scope, condition)
 		if err != nil || !match {
 			return
 		}
 	}
 
 	for _, group := range scope.Rule.ConditionGroups {
-		match, err = s.checkConditionGroup(ctx, scope.Company, scope.User, group)
+		match, err = s.checkConditionGroup(ctx, scope, group)
 		if err != nil || !match {
 			return
 		}
@@ -59,43 +61,43 @@ func (s *RuleCheckService) Check(ctx context.Context, scope *CheckScope) (res *C
 	return
 }
 
-func (s *RuleCheckService) checkCondition(ctx context.Context, company *Company, user *User, condition *Condition) (match bool, err error) {
+func (s *RuleCheckService) checkCondition(ctx context.Context, scope *CheckScope, condition *Condition) (match bool, err error) {
 	if condition == nil {
 		return false, nil
 	}
 
 	switch condition.ConditionType {
 	case ConditionTypeCompany:
-		return s.checkCompanyCondition(ctx, company, condition)
+		return s.checkCompanyCondition(ctx, scope.Company, condition)
 	case ConditionTypeMetric:
-		return s.checkMetricCondition(ctx, company, condition)
+		return s.checkMetricCondition(ctx, scope, condition)
 	case ConditionTypeBasePlan:
-		return s.checkBasePlanCondition(ctx, company, condition)
+		return s.checkBasePlanCondition(ctx, scope.Company, condition)
 	case ConditionTypePlan:
-		return s.checkPlanCondition(ctx, company, condition)
+		return s.checkPlanCondition(ctx, scope.Company, condition)
 	case ConditionTypeTrait:
-		return s.checkTraitCondition(ctx, company, user, condition)
+		return s.checkTraitCondition(ctx, scope, condition)
 	case ConditionTypeUser:
-		return s.checkUserCondition(ctx, user, condition)
+		return s.checkUserCondition(ctx, scope.User, condition)
 	case ConditionTypeBillingProduct:
-		return s.checkBillingProductCondition(ctx, company, condition)
+		return s.checkBillingProductCondition(ctx, scope.Company, condition)
 	case ConditionTypeCrmProduct:
-		return s.checkCrmProductCondition(ctx, company, condition)
+		return s.checkCrmProductCondition(ctx, scope.Company, condition)
 	case ConditionTypeCredit:
-		return s.checkCreditBalanceCondition(ctx, company, condition)
+		return s.checkCreditBalanceCondition(ctx, scope, condition)
 	}
 
 	return
 }
 
-func (s *RuleCheckService) checkConditionGroup(ctx context.Context, company *Company, user *User, group *ConditionGroup) (bool, error) {
+func (s *RuleCheckService) checkConditionGroup(ctx context.Context, scope *CheckScope, group *ConditionGroup) (bool, error) {
 	if group == nil {
 		return false, nil
 	}
 
 	// Condition groups are OR'd together, so we return true if any condition matches
 	for _, condition := range group.Conditions {
-		match, err := s.checkCondition(ctx, company, user, condition)
+		match, err := s.checkCondition(ctx, scope, condition)
 		if err != nil {
 			return false, err
 		}
@@ -121,25 +123,51 @@ func (s *RuleCheckService) checkCompanyCondition(ctx context.Context, company *C
 	return resourceMatch, nil
 }
 
-func (s *RuleCheckService) checkCreditBalanceCondition(ctx context.Context, company *Company, condition *Condition) (bool, error) {
-	if condition.ConditionType != ConditionTypeCredit || company == nil || condition.CreditID == nil {
+func (s *RuleCheckService) checkCreditBalanceCondition(ctx context.Context, scope *CheckScope, condition *Condition) (bool, error) {
+	if condition.ConditionType != ConditionTypeCredit || scope.Company == nil || condition.CreditID == nil {
 		return false, nil
 	}
 
-	var consumptionCost = float64(1)
+	var consumptionRate = float64(1)
 	if condition.ConsumptionRate != nil {
-		consumptionCost = *condition.ConsumptionRate
+		consumptionRate = *condition.ConsumptionRate
 	}
 
 	var creditBalance float64
-	for creditID, balance := range company.CreditBalances {
+	for creditID, balance := range scope.Company.CreditBalances {
 		if creditID == *condition.CreditID {
 			creditBalance = balance
 			break
 		}
 	}
 
-	return creditBalance >= consumptionCost, nil
+	// WithUsage: Check if there are enough credits for generic usage
+	if scope.Usage != nil && *scope.Usage > 0 {
+		creditsNeeded := float64(*scope.Usage) * consumptionRate
+		return creditBalance >= creditsNeeded, nil
+	}
+
+	// WithEventUsage: Check if there are enough credits for event-specific usage
+	if condition.EventSubtype != nil && scope.EventUsage != nil {
+		if eventUsage, ok := scope.EventUsage[*condition.EventSubtype]; ok && eventUsage > 0 {
+			creditsNeeded := float64(eventUsage) * consumptionRate
+			return creditBalance >= creditsNeeded, nil
+		}
+	}
+
+	// Check against current metric usage if EventSubtype is specified
+	if condition.EventSubtype != nil {
+		usage := int64(0)
+		metric := scope.Company.Metrics.Find(*condition.EventSubtype, condition.MetricPeriod, condition.MetricPeriodMonthReset)
+		if metric != nil {
+			usage = metric.Value
+		}
+
+		creditsNeeded := float64(usage) * consumptionRate
+		return creditBalance >= creditsNeeded, nil
+	}
+
+	return creditBalance >= consumptionRate, nil
 }
 
 func (s *RuleCheckService) checkBillingProductCondition(ctx context.Context, company *Company, condition *Condition) (bool, error) {
@@ -208,17 +236,27 @@ func (s *RuleCheckService) checkBasePlanCondition(ctx context.Context, company *
 
 func (s *RuleCheckService) checkMetricCondition(
 	ctx context.Context,
-	company *Company,
+	scope *CheckScope,
 	condition *Condition,
 ) (bool, error) {
-	if condition == nil || condition.ConditionType != ConditionTypeMetric || company == nil || condition.EventSubtype == nil {
+	if condition == nil || condition.ConditionType != ConditionTypeMetric || scope.Company == nil || condition.EventSubtype == nil {
 		return false, nil
 	}
 
 	leftVal := int64(0)
-	metric := company.Metrics.Find(*condition.EventSubtype, condition.MetricPeriod, condition.MetricPeriodMonthReset)
+	metric := scope.Company.Metrics.Find(*condition.EventSubtype, condition.MetricPeriod, condition.MetricPeriodMonthReset)
 	if metric != nil {
 		leftVal = metric.Value
+	}
+
+	// WithEventUsage: Add event-specific usage if this event matches
+	if scope.EventUsage != nil {
+		if eventUsage, ok := scope.EventUsage[*condition.EventSubtype]; ok && eventUsage > 0 {
+			leftVal += eventUsage
+		}
+	} else if scope.Usage != nil && *scope.Usage > 0 {
+		// WithUsage: Add generic usage to current metric value
+		leftVal += *scope.Usage
 	}
 
 	if condition.MetricValue == nil {
@@ -227,7 +265,7 @@ func (s *RuleCheckService) checkMetricCondition(
 
 	rightVal := *condition.MetricValue
 	if condition.ComparisonTraitDefinition != nil {
-		comparisonTrait := s.findTrait(ctx, condition.ComparisonTraitDefinition, company.Traits)
+		comparisonTrait := s.findTrait(ctx, condition.ComparisonTraitDefinition, scope.Company.Traits)
 		if comparisonTrait == nil {
 			rightVal = 0
 		} else {
@@ -239,7 +277,7 @@ func (s *RuleCheckService) checkMetricCondition(
 
 }
 
-func (s *RuleCheckService) checkTraitCondition(ctx context.Context, company *Company, user *User, condition *Condition) (bool, error) {
+func (s *RuleCheckService) checkTraitCondition(ctx context.Context, scope *CheckScope, condition *Condition) (bool, error) {
 	if condition == nil || condition.ConditionType != ConditionTypeTrait || condition.TraitDefinition == nil {
 		return false, nil
 	}
@@ -247,17 +285,17 @@ func (s *RuleCheckService) checkTraitCondition(ctx context.Context, company *Com
 	traitDef := condition.TraitDefinition
 	var trait *Trait
 	var comparisonTrait *Trait
-	if traitDef.EntityType == EntityTypeCompany && company != nil {
-		trait = s.findTrait(ctx, traitDef, company.Traits)
-		comparisonTrait = s.findTrait(ctx, condition.ComparisonTraitDefinition, company.Traits)
-	} else if traitDef.EntityType == EntityTypeUser && user != nil {
-		trait = s.findTrait(ctx, traitDef, user.Traits)
-		comparisonTrait = s.findTrait(ctx, condition.ComparisonTraitDefinition, user.Traits)
+	if traitDef.EntityType == EntityTypeCompany && scope.Company != nil {
+		trait = s.findTrait(ctx, traitDef, scope.Company.Traits)
+		comparisonTrait = s.findTrait(ctx, condition.ComparisonTraitDefinition, scope.Company.Traits)
+	} else if traitDef.EntityType == EntityTypeUser && scope.User != nil {
+		trait = s.findTrait(ctx, traitDef, scope.User.Traits)
+		comparisonTrait = s.findTrait(ctx, condition.ComparisonTraitDefinition, scope.User.Traits)
 	} else {
 		return false, nil
 	}
 
-	return s.compareTraits(ctx, condition, trait, comparisonTrait), nil
+	return s.compareTraitsWithUsage(ctx, scope, condition, trait, comparisonTrait), nil
 }
 
 func (s *RuleCheckService) checkUserCondition(ctx context.Context, user *User, condition *Condition) (bool, error) {
@@ -273,7 +311,7 @@ func (s *RuleCheckService) checkUserCondition(ctx context.Context, user *User, c
 	return resourceMatch, nil
 }
 
-func (s *RuleCheckService) compareTraits(ctx context.Context, condition *Condition, trait *Trait, comparisonTrait *Trait) bool {
+func (s *RuleCheckService) compareTraitsWithUsage(ctx context.Context, scope *CheckScope, condition *Condition, trait *Trait, comparisonTrait *Trait) bool {
 	var leftVal string
 	rightVal := condition.TraitValue
 	if trait != nil {
@@ -286,6 +324,12 @@ func (s *RuleCheckService) compareTraits(ctx context.Context, condition *Conditi
 	comparableType := typeconvert.ComparableTypeString
 	if trait != nil && trait.TraitDefinition != nil {
 		comparableType = trait.TraitDefinition.ComparableType
+	}
+
+	if comparableType == typeconvert.ComparableTypeInt && scope.Usage != nil && *scope.Usage > 0 {
+		leftNumeric := typeconvert.StringToInt64(leftVal)
+		leftNumeric += *scope.Usage
+		leftVal = fmt.Sprintf("%d", leftNumeric)
 	}
 
 	return typeconvert.Compare(leftVal, rightVal, comparableType, condition.Operator)

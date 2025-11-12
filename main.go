@@ -10,9 +10,11 @@ import (
 )
 
 type WasmInput struct {
-	Company Company `json:"company"`
-	User    User    `json:"user"`
-	Flag    Flag    `json:"flag"`
+	Company    Company          `json:"company"`
+	User       User             `json:"user"`
+	Flag       Flag             `json:"flag"`
+	Usage      *int64           `json:"usage,omitempty"`
+	EventUsage map[string]int64 `json:"event_usage,omitempty"`
 }
 
 type WasmOutput struct {
@@ -26,7 +28,15 @@ func checkFlag(this js.Value, args []js.Value) interface{} {
 	var wasmInput WasmInput
 	json.Unmarshal([]byte(input), &wasmInput)
 
-	result, err := CheckFlag(context.Background(), &wasmInput.Company, &wasmInput.User, &wasmInput.Flag)
+	var opts []CheckFlagOption
+	if wasmInput.Usage != nil {
+		opts = append(opts, WithUsage(*wasmInput.Usage))
+	}
+	for eventSubtype, quantity := range wasmInput.EventUsage {
+		opts = append(opts, WithEventUsage(eventSubtype, quantity))
+	}
+
+	result, err := CheckFlag(context.Background(), &wasmInput.Company, &wasmInput.User, &wasmInput.Flag, opts...)
 
 	output := WasmOutput{
 		Result: result,
