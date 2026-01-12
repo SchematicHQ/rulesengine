@@ -26,6 +26,17 @@ const (
 	EntityTypeCompany EntityType = "company"
 )
 
+type EntitlementValueType string
+
+const (
+	EntitlementValueTypeBoolean   EntitlementValueType = "boolean"
+	EntitlementValueTypeCredit    EntitlementValueType = "credit"
+	EntitlementValueTypeNumeric   EntitlementValueType = "numeric"
+	EntitlementValueTypeTrait     EntitlementValueType = "trait"
+	EntitlementValueTypeUnknown   EntitlementValueType = "unknown"
+	EntitlementValueTypeUnlimited EntitlementValueType = "unlimited"
+)
+
 type RuleType string
 
 func (t RuleType) DisplayName() string {
