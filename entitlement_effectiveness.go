@@ -1,26 +1,5 @@
 package rulesengine
 
-// This file contains the shared effectiveness logic for determining which entitlement
-// takes precedence when multiple entitlements exist for a feature.
-//
-// The logic is used by both:
-//   - apps/entitlements/services/usage.go (for GetFeatureUsageByCompany)
-//   - apps/companies/services/entitlements.go (for rules engine company building)
-//
-// Effectiveness rules:
-//   1. For boolean entitlements, company overrides always win over plan entitlements
-//      (supports "negative overrides" where override=false disables a plan feature)
-//   2. For numeric entitlements, the most generous allocation wins (normalized to daily rate)
-//   3. Resetting periods are more generous than all-time with the same raw value
-
-// EntitlementType represents whether an entitlement is from a plan or company override.
-type EntitlementType string
-
-const (
-	EntitlementTypePlanEntitlement EntitlementType = "plan_entitlement"
-	EntitlementTypeCompanyOverride EntitlementType = "company_override"
-)
-
 // NormalizeAllocationToDailyRate converts an allocation to a per-day equivalent for comparison.
 // Returns nil for unlimited allocations (nil input) or all-time periods (can't normalize).
 //

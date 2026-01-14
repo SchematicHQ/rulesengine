@@ -26,6 +26,14 @@ const (
 	EntityTypeCompany EntityType = "company"
 )
 
+// EntitlementType represents whether an entitlement is from a plan or company override.
+type EntitlementType string
+
+const (
+	EntitlementTypePlanEntitlement EntitlementType = "plan_entitlement"
+	EntitlementTypeCompanyOverride EntitlementType = "company_override"
+)
+
 type EntitlementValueType string
 
 const (
