@@ -101,7 +101,6 @@ func TestCompanyAddMetric(t *testing.T) {
 			EnvironmentID:     generateTestID("env"),
 			PlanIDs:           []string{generateTestID("plan"), generateTestID("plan")},
 			BillingProductIDs: []string{generateTestID("bilp"), generateTestID("bilp")},
-			CRMProductIDs:     []string{generateTestID("crmp"), generateTestID("crmp")},
 			BasePlanID:        null.Nullable(generateTestID("plan")),
 			Traits:            make([]*rulesengine.Trait, 0),
 			Subscription: &rulesengine.Subscription{

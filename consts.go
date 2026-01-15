@@ -12,7 +12,6 @@ const (
 	ConditionTypeBillingProduct ConditionType = "billing_product"
 	ConditionTypeCredit         ConditionType = "credit"
 	ConditionTypeCompany        ConditionType = "company"
-	ConditionTypeCrmProduct     ConditionType = "crm_product"
 	ConditionTypeMetric         ConditionType = "metric"
 	ConditionTypePlan           ConditionType = "plan"
 	ConditionTypeTrait          ConditionType = "trait"

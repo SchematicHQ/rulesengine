@@ -79,8 +79,6 @@ func (s *RuleCheckService) checkCondition(ctx context.Context, company *Company,
 		return s.checkUserCondition(ctx, user, condition)
 	case ConditionTypeBillingProduct:
 		return s.checkBillingProductCondition(ctx, company, condition)
-	case ConditionTypeCrmProduct:
-		return s.checkCrmProductCondition(ctx, company, condition)
 	case ConditionTypeCredit:
 		return s.checkCreditBalanceCondition(ctx, company, condition)
 	}
@@ -149,20 +147,6 @@ func (s *RuleCheckService) checkBillingProductCondition(ctx context.Context, com
 
 	companyBillingProductIDs := set.NewSet(company.BillingProductIDs...)
 	resourceMatch := set.NewSet(condition.ResourceIDs...).Intersection(companyBillingProductIDs).Len() > 0
-	if condition.Operator == typeconvert.ComparableOperatorNotEquals {
-		return !resourceMatch, nil
-	}
-
-	return resourceMatch, nil
-}
-
-func (s *RuleCheckService) checkCrmProductCondition(ctx context.Context, company *Company, condition *Condition) (bool, error) {
-	if condition.ConditionType != ConditionTypeCrmProduct || company == nil {
-		return false, nil
-	}
-
-	companyCrmProductIDs := set.NewSet(company.CRMProductIDs...)
-	resourceMatch := set.NewSet(condition.ResourceIDs...).Intersection(companyCrmProductIDs).Len() > 0
 	if condition.Operator == typeconvert.ComparableOperatorNotEquals {
 		return !resourceMatch, nil
 	}
