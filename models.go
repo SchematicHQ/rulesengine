@@ -152,7 +152,7 @@ type Company struct {
 	Subscription      *Subscription           `json:"subscription"`
 	Traits            []*Trait                `json:"traits"`
 	Rules             []*Rule                 `json:"rules"`
-	Entitlements      []*FeatureEntitlement   `json:"entitlements"`
+	Entitlements      []*FeatureEntitlement   `json:"entitlements,omitempty"`
 
 	mu sync.Mutex `json:"-"` // mutex for thread safety
 }
