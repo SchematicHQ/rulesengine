@@ -123,6 +123,20 @@ type Subscription struct {
 	PeriodEnd   time.Time `json:"period_end"`
 }
 
+type FeatureEntitlement struct {
+	FeatureID       string                  `json:"feature_id"`
+	FeatureKey      string                  `json:"feature_key"`
+	ValueType       EntitlementValueType    `json:"value_type" binding:"oneof=boolean credit numeric trait unknown unlimited"`
+	Allocation      *int64                  `json:"allocation"`
+	MetricPeriod    *MetricPeriod           `json:"metric_period" binding:"oneof=all_time current_day current_month current_week"`
+	MonthReset      *MetricPeriodMonthReset `json:"month_reset" binding:"oneof=first_of_month billing_cycle"`
+	MetricResetAt   *time.Time              `json:"metric_reset_at"`
+	CreditID        *string                 `json:"credit_id"`
+	CreditTotal     *float64                `json:"credit_total"`
+	CreditUsed      *float64                `json:"credit_used"`
+	CreditRemaining *float64                `json:"credit_remaining"`
+}
+
 type Company struct {
 	ID            string `json:"id"`
 	AccountID     string `json:"account_id"`
@@ -138,7 +152,9 @@ type Company struct {
 	Subscription      *Subscription           `json:"subscription"`
 	Traits            []*Trait                `json:"traits"`
 	Rules             []*Rule                 `json:"rules"`
-	mu                sync.Mutex              `json:"-"` // mutex for thread safety
+	Entitlements      []*FeatureEntitlement   `json:"entitlements,omitempty"`
+
+	mu sync.Mutex `json:"-"` // mutex for thread safety
 }
 
 func (c *Company) getTraitByDefinitionID(traitDefinitionID string) *Trait {
