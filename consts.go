@@ -25,6 +25,25 @@ const (
 	EntityTypeCompany EntityType = "company"
 )
 
+// EntitlementType represents whether an entitlement is from a plan or company override.
+type EntitlementType string
+
+const (
+	EntitlementTypePlanEntitlement EntitlementType = "plan_entitlement"
+	EntitlementTypeCompanyOverride EntitlementType = "company_override"
+)
+
+type EntitlementValueType string
+
+const (
+	EntitlementValueTypeBoolean   EntitlementValueType = "boolean"
+	EntitlementValueTypeCredit    EntitlementValueType = "credit"
+	EntitlementValueTypeNumeric   EntitlementValueType = "numeric"
+	EntitlementValueTypeTrait     EntitlementValueType = "trait"
+	EntitlementValueTypeUnknown   EntitlementValueType = "unknown"
+	EntitlementValueTypeUnlimited EntitlementValueType = "unlimited"
+)
+
 type RuleType string
 
 func (t RuleType) DisplayName() string {
