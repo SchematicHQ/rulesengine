@@ -159,6 +159,17 @@ func (s *RuleCheckService) checkPlanCondition(ctx context.Context, company *Comp
 		return false, nil
 	}
 
+	// Prefer plan version matching when both sides have version data
+	if len(condition.PlanVersionResourceIDs) > 0 && len(company.PlanVersionIDs) > 0 {
+		companyVersionIDs := set.NewSet(company.PlanVersionIDs...)
+		versionMatch := set.NewSet(condition.PlanVersionResourceIDs...).Intersection(companyVersionIDs).Len() > 0
+		if condition.Operator == typeconvert.ComparableOperatorNotEquals {
+			return !versionMatch, nil
+		}
+		return versionMatch, nil
+	}
+
+	// Fallback: plan ID matching (existing behavior)
 	companyPlanIDs := set.NewSet(company.PlanIDs...)
 	resourceMatch := set.NewSet(condition.ResourceIDs...).Intersection(companyPlanIDs).Len() > 0
 	if condition.Operator == typeconvert.ComparableOperatorNotEquals {

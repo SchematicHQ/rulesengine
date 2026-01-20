@@ -45,6 +45,9 @@ type Condition struct {
 	// Fields relevant when ConditionType is one of Company, User, Plan, Base Plan, Billing Product, or Billing Credit
 	ResourceIDs []string `json:"resource_ids"`
 
+	// Fields relevant when ConditionType = Plan
+	PlanVersionResourceIDs []string `json:"plan_version_resource_ids"`
+
 	// Fields relevant when ConditionType = Event
 	EventSubtype           *string                 `json:"event_subtype"`
 	MetricValue            *int64                  `json:"metric_value"`
@@ -144,14 +147,15 @@ type Company struct {
 
 	BasePlanID        *string                 `json:"base_plan_id"`
 	BillingProductIDs []string                `json:"billing_product_ids"`
-	Keys              map[string]string       `json:"keys"`
-	PlanIDs           []string                `json:"plan_ids"`
-	Metrics           CompanyMetricCollection `json:"metrics"`
 	CreditBalances    map[string]float64      `json:"credit_balances"`
+	Entitlements      []*FeatureEntitlement   `json:"entitlements,omitempty"`
+	Keys              map[string]string       `json:"keys"`
+	Metrics           CompanyMetricCollection `json:"metrics"`
+	PlanIDs           []string                `json:"plan_ids"`
+	PlanVersionIDs    []string                `json:"plan_version_ids"`
+	Rules             []*Rule                 `json:"rules"`
 	Subscription      *Subscription           `json:"subscription"`
 	Traits            []*Trait                `json:"traits"`
-	Rules             []*Rule                 `json:"rules"`
-	Entitlements      []*FeatureEntitlement   `json:"entitlements,omitempty"`
 
 	mu sync.Mutex `json:"-"` // mutex for thread safety
 }
