@@ -127,10 +127,11 @@ type FeatureEntitlement struct {
 	FeatureID       string                  `json:"feature_id"`
 	FeatureKey      string                  `json:"feature_key"`
 	ValueType       EntitlementValueType    `json:"value_type" binding:"oneof=boolean credit numeric trait unknown unlimited"`
-	Allocation      *int64                  `json:"allocation"`
-	MetricPeriod    *MetricPeriod           `json:"metric_period" binding:"oneof=all_time current_day current_month current_week"`
+	Allocation      *int64                  `json:"allocation" desc:"If a numeric feature entitlement rule was matched, its allocation"`
+	Usage           *int64                  `json:"usage" desc:"If a numeric feature entitlement rule was matched, the company's usage"`
+	MetricPeriod    *MetricPeriod           `json:"metric_period" binding:"oneof=all_time current_day current_month current_week" desc:"For event-based feature entitlement rules, the period over which usage is tracked (current_month, current_day, current_week, all_time)"`
 	MonthReset      *MetricPeriodMonthReset `json:"month_reset" binding:"oneof=first_of_month billing_cycle"`
-	MetricResetAt   *time.Time              `json:"metric_reset_at"`
+	MetricResetAt   *time.Time              `json:"metric_reset_at" desc:"For event-based feature entitlement rules, when the usage period will reset"`
 	CreditID        *string                 `json:"credit_id"`
 	CreditTotal     *float64                `json:"credit_total"`
 	CreditUsed      *float64                `json:"credit_used"`
