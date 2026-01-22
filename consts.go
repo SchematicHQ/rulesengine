@@ -14,6 +14,7 @@ const (
 	ConditionTypeCompany        ConditionType = "company"
 	ConditionTypeMetric         ConditionType = "metric"
 	ConditionTypePlan           ConditionType = "plan"
+	ConditionTypePlanVersion    ConditionType = "plan_version"
 	ConditionTypeTrait          ConditionType = "trait"
 	ConditionTypeUser           ConditionType = "user"
 )

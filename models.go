@@ -39,14 +39,11 @@ type Condition struct {
 	ID            string                         `json:"id"`
 	AccountID     string                         `json:"account_id"`
 	EnvironmentID string                         `json:"environment_id"`
-	ConditionType ConditionType                  `json:"condition_type" binding:"oneof=base_plan billing_product company credit metric plan trait user"`
+	ConditionType ConditionType                  `json:"condition_type" binding:"oneof=base_plan billing_product company credit metric plan plan_version trait user"`
 	Operator      typeconvert.ComparableOperator `json:"operator" binding:"oneof=eq ne gt lt gte lte is_empty not_empty"`
 
-	// Fields relevant when ConditionType is one of Company, User, Plan, Base Plan, Billing Product, or Billing Credit
+	// Fields relevant when ConditionType is one of Company, User, Plan, Plan Version, Base Plan, Billing Product, or Billing Credit
 	ResourceIDs []string `json:"resource_ids"`
-
-	// Fields relevant when ConditionType = Plan
-	PlanVersionResourceIDs []string `json:"plan_version_resource_ids"`
 
 	// Fields relevant when ConditionType = Event
 	EventSubtype           *string                 `json:"event_subtype"`

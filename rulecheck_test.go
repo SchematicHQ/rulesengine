@@ -437,4 +437,42 @@ func TestRuleCheckService(t *testing.T) {
 			assert.False(t, result.Match, "Rule should not match with non-matching condition")
 		})
 	})
+
+	t.Run("Plan version condition evaluation", func(t *testing.T) {
+		t.Run("Rule matches when plan version ID is in company's plan version IDs", func(t *testing.T) {
+			svc := rulesengine.NewRuleCheckService()
+			company := createTestCompany()
+
+			rule := createTestRule()
+			condition := createTestCondition(rulesengine.ConditionTypePlanVersion)
+			condition.ResourceIDs = []string{company.PlanVersionIDs[0]}
+			rule.Conditions = []*rulesengine.Condition{condition}
+
+			result, err := svc.Check(ctx, &rulesengine.CheckScope{
+				Company: company,
+				Rule:    rule,
+			})
+
+			assert.NoError(t, err)
+			assert.True(t, result.Match)
+		})
+
+		t.Run("Rule does not match when plan version ID is not in company's plan version IDs", func(t *testing.T) {
+			svc := rulesengine.NewRuleCheckService()
+			company := createTestCompany()
+
+			rule := createTestRule()
+			condition := createTestCondition(rulesengine.ConditionTypePlanVersion)
+			condition.ResourceIDs = []string{"non-matching-version-id"}
+			rule.Conditions = []*rulesengine.Condition{condition}
+
+			result, err := svc.Check(ctx, &rulesengine.CheckScope{
+				Company: company,
+				Rule:    rule,
+			})
+
+			assert.NoError(t, err)
+			assert.False(t, result.Match)
+		})
+	})
 }
