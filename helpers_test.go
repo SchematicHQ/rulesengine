@@ -22,6 +22,7 @@ func createTestCompany() *rulesengine.Company {
 		AccountID:         generateTestID("acct"),
 		EnvironmentID:     generateTestID("env"),
 		PlanIDs:           []string{generateTestID("plan"), generateTestID("plan")},
+		PlanVersionIDs:    []string{generateTestID("plnv"), generateTestID("plnv")},
 		BillingProductIDs: []string{generateTestID("bilp"), generateTestID("bilp")},
 		BasePlanID:        null.Nullable(generateTestID("plan")),
 		Metrics:           make(rulesengine.CompanyMetricCollection, 0),

@@ -39,10 +39,10 @@ type Condition struct {
 	ID            string                         `json:"id"`
 	AccountID     string                         `json:"account_id"`
 	EnvironmentID string                         `json:"environment_id"`
-	ConditionType ConditionType                  `json:"condition_type" binding:"oneof=base_plan billing_product company credit metric plan trait user"`
+	ConditionType ConditionType                  `json:"condition_type" binding:"oneof=base_plan billing_product company credit metric plan plan_version trait user"`
 	Operator      typeconvert.ComparableOperator `json:"operator" binding:"oneof=eq ne gt lt gte lte is_empty not_empty"`
 
-	// Fields relevant when ConditionType is one of Company, User, Plan, Base Plan, Billing Product, or Billing Credit
+	// Fields relevant when ConditionType is one of Company, User, Plan, Plan Version, Base Plan, Billing Product, or Billing Credit
 	ResourceIDs []string `json:"resource_ids"`
 
 	// Fields relevant when ConditionType = Event
@@ -146,14 +146,15 @@ type Company struct {
 
 	BasePlanID        *string                 `json:"base_plan_id"`
 	BillingProductIDs []string                `json:"billing_product_ids"`
-	Keys              map[string]string       `json:"keys"`
-	PlanIDs           []string                `json:"plan_ids"`
-	Metrics           CompanyMetricCollection `json:"metrics"`
 	CreditBalances    map[string]float64      `json:"credit_balances"`
+	Entitlements      []*FeatureEntitlement   `json:"entitlements,omitempty"`
+	Keys              map[string]string       `json:"keys"`
+	Metrics           CompanyMetricCollection `json:"metrics"`
+	PlanIDs           []string                `json:"plan_ids"`
+	PlanVersionIDs    []string                `json:"plan_version_ids"`
+	Rules             []*Rule                 `json:"rules"`
 	Subscription      *Subscription           `json:"subscription"`
 	Traits            []*Trait                `json:"traits"`
-	Rules             []*Rule                 `json:"rules"`
-	Entitlements      []*FeatureEntitlement   `json:"entitlements,omitempty"`
 
 	mu sync.Mutex `json:"-"` // mutex for thread safety
 }

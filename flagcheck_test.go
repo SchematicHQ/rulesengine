@@ -647,6 +647,124 @@ func TestCheckFlag(t *testing.T) {
 		})
 	})
 
+	t.Run("Plan version condition type", func(t *testing.T) {
+		t.Run("Matches when plan version IDs match", func(t *testing.T) {
+			company := createTestCompany()
+			flag := createTestFlag()
+			flag.DefaultValue = false
+
+			rule := createTestRule()
+			rule.Value = true
+			condition := createTestCondition(rulesengine.ConditionTypePlanVersion)
+			condition.ResourceIDs = []string{company.PlanVersionIDs[0]}
+			rule.Conditions = append(rule.Conditions, condition)
+			flag.Rules = append(flag.Rules, rule)
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag)
+
+			assert.NoError(t, err)
+			assert.True(t, result.Value)
+			assert.Equal(t, &rule.ID, result.RuleID)
+		})
+
+		t.Run("Does not match when plan version IDs differ", func(t *testing.T) {
+			company := createTestCompany()
+			flag := createTestFlag()
+			flag.DefaultValue = false
+
+			rule := createTestRule()
+			rule.Value = true
+			condition := createTestCondition(rulesengine.ConditionTypePlanVersion)
+			condition.ResourceIDs = []string{"non-matching-version-id"}
+			rule.Conditions = append(rule.Conditions, condition)
+			flag.Rules = append(flag.Rules, rule)
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag)
+
+			assert.NoError(t, err)
+			assert.False(t, result.Value)
+			assert.Equal(t, rulesengine.ReasonNoRulesMatched, result.Reason)
+		})
+
+		t.Run("Returns false when company has no plan version IDs", func(t *testing.T) {
+			company := createTestCompany()
+			company.PlanVersionIDs = []string{} // Clear version IDs
+			flag := createTestFlag()
+			flag.DefaultValue = false
+
+			rule := createTestRule()
+			rule.Value = true
+			condition := createTestCondition(rulesengine.ConditionTypePlanVersion)
+			condition.ResourceIDs = []string{"some-version-id"}
+			rule.Conditions = append(rule.Conditions, condition)
+			flag.Rules = append(flag.Rules, rule)
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag)
+
+			assert.NoError(t, err)
+			assert.False(t, result.Value)
+			assert.Equal(t, rulesengine.ReasonNoRulesMatched, result.Reason)
+		})
+
+		t.Run("NotEquals operator returns true when versions differ", func(t *testing.T) {
+			company := createTestCompany()
+			flag := createTestFlag()
+			flag.DefaultValue = false
+
+			rule := createTestRule()
+			rule.Value = true
+			condition := createTestCondition(rulesengine.ConditionTypePlanVersion)
+			condition.ResourceIDs = []string{"non-matching-version-id"}
+			condition.Operator = typeconvert.ComparableOperatorNotEquals
+			rule.Conditions = append(rule.Conditions, condition)
+			flag.Rules = append(flag.Rules, rule)
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag)
+
+			assert.NoError(t, err)
+			assert.True(t, result.Value)
+			assert.Equal(t, &rule.ID, result.RuleID)
+		})
+
+		t.Run("NotEquals operator returns false when versions match", func(t *testing.T) {
+			company := createTestCompany()
+			flag := createTestFlag()
+			flag.DefaultValue = true
+
+			rule := createTestRule()
+			rule.Value = false
+			condition := createTestCondition(rulesengine.ConditionTypePlanVersion)
+			condition.ResourceIDs = []string{company.PlanVersionIDs[0]}
+			condition.Operator = typeconvert.ComparableOperatorNotEquals
+			rule.Conditions = append(rule.Conditions, condition)
+			flag.Rules = append(flag.Rules, rule)
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag)
+
+			assert.NoError(t, err)
+			assert.True(t, result.Value) // Fallback to default, rule condition doesn't match
+			assert.Equal(t, rulesengine.ReasonNoRulesMatched, result.Reason)
+		})
+
+		t.Run("Returns false when company is nil", func(t *testing.T) {
+			flag := createTestFlag()
+			flag.DefaultValue = false
+
+			rule := createTestRule()
+			rule.Value = true
+			condition := createTestCondition(rulesengine.ConditionTypePlanVersion)
+			condition.ResourceIDs = []string{"some-version-id"}
+			rule.Conditions = append(rule.Conditions, condition)
+			flag.Rules = append(flag.Rules, rule)
+
+			result, err := rulesengine.CheckFlag(ctx, nil, nil, flag)
+
+			assert.NoError(t, err)
+			assert.False(t, result.Value)
+			assert.Equal(t, rulesengine.ReasonNoRulesMatched, result.Reason)
+		})
+	})
+
 	t.Run("Complex scenarios", func(t *testing.T) {
 		t.Run("Handles multiple condition types and groups", func(t *testing.T) {
 			company := createTestCompany()

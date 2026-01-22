@@ -73,6 +73,8 @@ func (s *RuleCheckService) checkCondition(ctx context.Context, company *Company,
 		return s.checkBasePlanCondition(ctx, company, condition)
 	case ConditionTypePlan:
 		return s.checkPlanCondition(ctx, company, condition)
+	case ConditionTypePlanVersion:
+		return s.checkPlanVersionCondition(ctx, company, condition)
 	case ConditionTypeTrait:
 		return s.checkTraitCondition(ctx, company, user, condition)
 	case ConditionTypeUser:
@@ -161,6 +163,21 @@ func (s *RuleCheckService) checkPlanCondition(ctx context.Context, company *Comp
 
 	companyPlanIDs := set.NewSet(company.PlanIDs...)
 	resourceMatch := set.NewSet(condition.ResourceIDs...).Intersection(companyPlanIDs).Len() > 0
+	if condition.Operator == typeconvert.ComparableOperatorNotEquals {
+		return !resourceMatch, nil
+	}
+
+	return resourceMatch, nil
+}
+
+func (s *RuleCheckService) checkPlanVersionCondition(ctx context.Context, company *Company, condition *Condition) (bool, error) {
+	if condition.ConditionType != ConditionTypePlanVersion || company == nil {
+		return false, nil
+	}
+
+	companyPlanVersionIDs := set.NewSet(company.PlanVersionIDs...)
+	resourceMatch := set.NewSet(condition.ResourceIDs...).Intersection(companyPlanVersionIDs).Len() > 0
+
 	if condition.Operator == typeconvert.ComparableOperatorNotEquals {
 		return !resourceMatch, nil
 	}
