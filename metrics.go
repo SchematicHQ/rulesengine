@@ -207,16 +207,26 @@ func GetNextMetricPeriodStartForCalendarMetricPeriod(metricPeriod MetricPeriod) 
 	return nil
 }
 
-// Given a company, determine the next metric period start based on the company's billing subscription
+// GetNextMetricPeriodStartForCompanyBillingSubscription determines the next metric period start
+// based on the company's billing subscription.
 func GetNextMetricPeriodStartForCompanyBillingSubscription(company *Company) *time.Time {
+	if company == nil {
+		return GetNextMetricPeriodStartForSubscription(nil)
+	}
+	return GetNextMetricPeriodStartForSubscription(company.Subscription)
+}
+
+// GetNextMetricPeriodStartForSubscription determines the next metric period start based on the
+// subscription's billing cycle. If subscription is nil, returns the start of the next calendar month.
+func GetNextMetricPeriodStartForSubscription(subscription *Subscription) *time.Time {
 	// if no subscription exists, we use calendar month reset
-	if company == nil || company.Subscription == nil {
+	if subscription == nil {
 		return GetNextMetricPeriodStartForCalendarMetricPeriod(MetricPeriodCurrentMonth)
 	}
 
 	now := time.Now().UTC()
-	periodEnd := company.Subscription.PeriodEnd
-	periodStart := company.Subscription.PeriodStart
+	periodEnd := subscription.PeriodEnd
+	periodStart := subscription.PeriodStart
 
 	// if the start period is in the future, the metric period is from the start of the current calendar month until either
 	// the end of the current calendar month or the start of the billing period, whichever comes first

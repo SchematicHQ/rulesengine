@@ -35,6 +35,14 @@ func createTestCompany() *rulesengine.Company {
 	}
 }
 
+func createTestSubscription() *rulesengine.Subscription {
+	return &rulesengine.Subscription{
+		ID:          generateTestID("bilsub"),
+		PeriodStart: time.Now().Add(-30 * 24 * time.Hour),
+		PeriodEnd:   time.Now().Add(30 * 24 * time.Hour),
+	}
+}
+
 func createTestUser() *rulesengine.User {
 	return &rulesengine.User{
 		ID:            generateTestID("user"),
