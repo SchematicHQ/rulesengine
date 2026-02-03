@@ -10,20 +10,21 @@ import (
 )
 
 type CheckFlagResult struct {
-	CompanyID           *string       `json:"company_id,omitempty"`
-	Err                 error         `json:"err,omitempty"`
-	FeatureAllocation   *int64        `json:"feature_allocation,omitempty"`
-	FeatureUsage        *int64        `json:"feature_usage,omitempty"`
-	FeatureUsageEvent   *string       `json:"feature_usage_event,omitempty"`
-	FeatureUsagePeriod  *MetricPeriod `json:"feature_usage_period,omitempty" binding:"oneof=all_time current_day current_month current_week"`
-	FeatureUsageResetAt *time.Time    `json:"feature_usage_reset_at,omitempty"`
-	FlagID              *string       `json:"flag_id,omitempty"`
-	FlagKey             string        `json:"flag_key"`
-	Reason              string        `json:"reason"`
-	RuleID              *string       `json:"rule_id,omitempty"`
-	RuleType            *RuleType     `json:"rule_type,omitempty" binding:"oneof=default global_override company_override company_override_usage_exceeded plan_entitlement plan_entitlement_usage_exceeded standard"`
-	UserID              *string       `json:"user_id,omitempty"`
-	Value               bool          `json:"value"`
+	CompanyID           *string             `json:"company_id,omitempty"`
+	Err                 error               `json:"err,omitempty"`
+	Entitlement         *FeatureEntitlement `json:"entitlement,omitempty"`
+	FeatureAllocation   *int64              `json:"feature_allocation,omitempty"`
+	FeatureUsage        *int64              `json:"feature_usage,omitempty"`
+	FeatureUsageEvent   *string             `json:"feature_usage_event,omitempty"`
+	FeatureUsagePeriod  *MetricPeriod       `json:"feature_usage_period,omitempty" binding:"oneof=all_time current_day current_month current_week"`
+	FeatureUsageResetAt *time.Time          `json:"feature_usage_reset_at,omitempty"`
+	FlagID              *string             `json:"flag_id,omitempty"`
+	FlagKey             string              `json:"flag_key"`
+	Reason              string              `json:"reason"`
+	RuleID              *string             `json:"rule_id,omitempty"`
+	RuleType            *RuleType           `json:"rule_type,omitempty" binding:"oneof=default global_override company_override company_override_usage_exceeded plan_entitlement plan_entitlement_usage_exceeded standard"`
+	UserID              *string             `json:"user_id,omitempty"`
+	Value               bool                `json:"value"`
 }
 
 const (
@@ -64,7 +65,8 @@ func (r *CheckFlagResult) setRuleFields(company *Company, rule *Rule) {
 	// set usage, allocation, and other usage-related fields
 	var usage int64
 	var allocation int64
-	if usageCondition.ConditionType == ConditionTypeMetric {
+	switch usageCondition.ConditionType {
+	case ConditionTypeMetric:
 		if usageCondition.EventSubtype != nil {
 			r.FeatureUsageEvent = usageCondition.EventSubtype
 			usageMetric := company.Metrics.Find(*usageCondition.EventSubtype, usageCondition.MetricPeriod, usageCondition.MetricPeriodMonthReset)
@@ -83,7 +85,7 @@ func (r *CheckFlagResult) setRuleFields(company *Company, rule *Rule) {
 		}
 		r.FeatureUsagePeriod = &metricPeriod
 		r.FeatureUsageResetAt = GetNextMetricPeriodStartFromCondition(usageCondition, company)
-	} else if usageCondition.ConditionType == ConditionTypeTrait {
+	case ConditionTypeTrait:
 		if usageCondition.TraitDefinition != nil {
 			companyUsageTrait := company.getTraitByDefinitionID(usageCondition.TraitDefinition.ID)
 			if companyUsageTrait != nil {
@@ -126,6 +128,14 @@ func CheckFlag(
 
 	if company != nil {
 		resp.CompanyID = &company.ID
+
+		// Find matching entitlement from company.Entitlements by feature key
+		for _, ent := range company.Entitlements {
+			if ent != nil && ent.FeatureKey == flag.Key {
+				resp.Entitlement = ent
+				break
+			}
+		}
 	}
 	if user != nil {
 		resp.UserID = &user.ID

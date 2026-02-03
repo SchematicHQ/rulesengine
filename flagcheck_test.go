@@ -213,6 +213,51 @@ func TestCheckFlag(t *testing.T) {
 			assert.NotNil(t, result.FeatureAllocation)
 			assert.Equal(t, int64(10), *result.FeatureAllocation)
 		})
+
+		t.Run("Returns entitlement from company when rule matches", func(t *testing.T) {
+			company := createTestCompany()
+			flag := createTestFlag()
+
+			// Create entitlement with matching feature key
+			allocation := int64(100)
+			usage := int64(50)
+			eventName := "test-event"
+			creditTotal := 1000.0
+
+			entitlement := &rulesengine.FeatureEntitlement{
+				FeatureID:   generateTestID("feat"),
+				FeatureKey:  flag.Key, // Match the flag key
+				ValueType:   rulesengine.EntitlementValueTypeNumeric,
+				Allocation:  &allocation,
+				Usage:       &usage,
+				EventName:   &eventName,
+				CreditTotal: &creditTotal,
+			}
+			company.Entitlements = []*rulesengine.FeatureEntitlement{entitlement}
+
+			// Create entitlement rule
+			rule := createTestRule()
+			rule.RuleType = rulesengine.RuleTypePlanEntitlement
+			rule.Value = true
+
+			// Add a simple company condition so the rule matches
+			condition := createTestCondition(rulesengine.ConditionTypeCompany)
+			condition.ResourceIDs = []string{company.ID}
+			rule.Conditions = append(rule.Conditions, condition)
+			flag.Rules = append(flag.Rules, rule)
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag)
+
+			assert.NoError(t, err)
+			assert.True(t, result.Value)
+			assert.Equal(t, &rule.ID, result.RuleID)
+			assert.NotNil(t, result.Entitlement)
+			assert.Equal(t, entitlement.FeatureID, result.Entitlement.FeatureID)
+			assert.Equal(t, entitlement.FeatureKey, result.Entitlement.FeatureKey)
+			assert.Equal(t, entitlement.ValueType, result.Entitlement.ValueType)
+			assert.Equal(t, entitlement.Allocation, result.Entitlement.Allocation)
+			assert.Equal(t, entitlement.Usage, result.Entitlement.Usage)
+		})
 	})
 
 	t.Run("User context", func(t *testing.T) {
