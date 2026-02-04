@@ -125,18 +125,19 @@ type Subscription struct {
 
 type FeatureEntitlement struct {
 	FeatureID       string                  `json:"feature_id" desc:"The ID of the feature"`
-	FeatureKey      string                  `json:"feature_key" desc:"The key of the feature"`
+	FeatureKey      string                  `json:"feature_key" desc:"The key of the flag associated with the feature"`
 	ValueType       EntitlementValueType    `json:"value_type" binding:"oneof=boolean credit numeric trait unknown unlimited" desc:"The type of the entitlement value"`
-	Allocation      *int64                  `json:"allocation" desc:"If a numeric feature entitlement rule was matched, its allocation"`
-	Usage           *int64                  `json:"usage" desc:"If a numeric feature entitlement rule was matched, the company's usage"`
-	EventName       *string                 `json:"event_name" desc:"For event-based feature entitlement rules, the name of the event being tracked"`
-	MetricPeriod    *MetricPeriod           `json:"metric_period" binding:"oneof=all_time current_day current_month current_week" desc:"For event-based feature entitlement rules, the period over which usage is tracked (current_month, current_day, current_week, all_time)"`
-	MonthReset      *MetricPeriodMonthReset `json:"month_reset" binding:"oneof=first_of_month billing_cycle" desc:"For event-based feature entitlement rules, when the usage period resets (first_of_month or billing_cycle)"`
-	MetricResetAt   *time.Time              `json:"metric_reset_at" desc:"For event-based feature entitlement rules, when the usage period will reset"`
-	CreditID        *string                 `json:"credit_id" desc:"If a credit-based feature entitlement rule was matched, the ID of the credit"`
-	CreditTotal     *float64                `json:"credit_total" desc:"If a credit-based feature entitlement rule was matched, the total credit amount"`
-	CreditUsed      *float64                `json:"credit_used" desc:"If a credit-based feature entitlement rule was matched, the amount of credit used"`
-	CreditRemaining *float64                `json:"credit_remaining" desc:"If a credit-based feature entitlement rule was matched, the remaining credit amount"`
+	Allocation      *int64                  `json:"allocation" desc:"If the company has a numeric entitlement for this feature, the allocated amount"`
+	SoftLimit       *int64                  `json:"soft_limit" desc:"For usage-based pricing, the soft limit for overage charges or the next tier boundary"`
+	Usage           *int64                  `json:"usage" desc:"If the company has a numeric entitlement for this feature, the current usage amount"`
+	EventName       *string                 `json:"event_name" desc:"If the feature is event-based, the name of the event tracked for usage"`
+	MetricPeriod    *MetricPeriod           `json:"metric_period" binding:"oneof=all_time current_day current_month current_week" desc:"For event-based feature entitlements, the period over which usage is tracked"`
+	MonthReset      *MetricPeriodMonthReset `json:"month_reset" binding:"oneof=first_of_month billing_cycle" desc:"For event-based feature entitlements that have a monthly period, whether that monthly reset is based on the calendar month or a billing cycle"`
+	MetricResetAt   *time.Time              `json:"metric_reset_at" desc:"For event-based feature entitlements, when the usage period will reset"`
+	CreditID        *string                 `json:"credit_id" desc:"If the company has a credit-based entitlement for this feature, the ID of the credit"`
+	CreditTotal     *float64                `json:"credit_total" desc:"If the company has a credit-based entitlement for this feature, the total credit amount"`
+	CreditUsed      *float64                `json:"credit_used" desc:"If the company has a credit-based entitlement for this feature, the amount of credit used"`
+	CreditRemaining *float64                `json:"credit_remaining" desc:"If the company has a credit-based entitlement for this feature, the remaining credit amount"`
 }
 
 type Company struct {
