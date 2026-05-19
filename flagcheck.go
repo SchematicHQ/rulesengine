@@ -113,8 +113,19 @@ func CheckFlag(
 	company *Company,
 	user *User,
 	flag *Flag,
+	opts ...CheckFlagOption,
 ) (*CheckFlagResult, error) {
+	options := newCheckFlagOptions()
+	for _, opt := range opts {
+		opt(options)
+	}
+
 	resp := &CheckFlagResult{Reason: ReasonNoRulesMatched}
+
+	if err := options.validate(); err != nil {
+		resp.Err = err
+		return resp, err
+	}
 
 	if flag == nil {
 		resp.Reason = ReasonFlagNotFound
@@ -164,9 +175,12 @@ func CheckFlag(
 			}
 
 			checkRuleResp, err := ruleChecker.Check(ctx, &CheckScope{
-				Company: company,
-				Rule:    rule,
-				User:    user,
+				Company:    company,
+				Rule:       rule,
+				User:       user,
+				creditCost: options.creditCost,
+				usage:      options.usage,
+				eventUsage: options.eventUsage,
 			})
 			if err != nil {
 				resp.Err = err

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/schematichq/rulesengine"
+	"github.com/schematichq/rulesengine/null"
 	"github.com/schematichq/rulesengine/typeconvert"
 	"github.com/stretchr/testify/assert"
 )
@@ -875,6 +876,306 @@ func TestCheckFlag(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, flag.DefaultValue, result.Value)
 			assert.Equal(t, rulesengine.ReasonNoRulesMatched, result.Reason)
+		})
+	})
+
+	t.Run("Preflight options", func(t *testing.T) {
+		// Builds a flag wrapping a credit-balance rule with an optional event_subtype.
+		// Returns flag and rule so callers can assert on result.RuleID == &rule.ID.
+		creditFlag := func(creditID string, consumptionRate float64, eventSubtype *string) (*rulesengine.Flag, *rulesengine.Rule) {
+			rule := createTestRule()
+			condition := createTestCondition(rulesengine.ConditionTypeCredit)
+			condition.Operator = typeconvert.ComparableOperatorGte
+			condition.CreditID = &creditID
+			condition.ConsumptionRate = null.Nullable(consumptionRate)
+			condition.EventSubtype = eventSubtype
+			rule.Conditions = []*rulesengine.Condition{condition}
+
+			flag := createTestFlag()
+			flag.DefaultValue = false
+			flag.Rules = []*rulesengine.Rule{rule}
+			return flag, rule
+		}
+
+		t.Run("Validation", func(t *testing.T) {
+			t.Run("Rejects negative WithUsage", func(t *testing.T) {
+				company := createTestCompany()
+				flag := createTestFlag()
+
+				result, err := rulesengine.CheckFlag(ctx, company, nil, flag, rulesengine.WithUsage(-1))
+
+				assert.Equal(t, rulesengine.ErrorNegativePreflightUsage, err)
+				assert.Equal(t, rulesengine.ErrorNegativePreflightUsage, result.Err)
+			})
+
+			t.Run("Rejects negative WithEventUsage", func(t *testing.T) {
+				company := createTestCompany()
+				flag := createTestFlag()
+
+				result, err := rulesengine.CheckFlag(ctx, company, nil, flag, rulesengine.WithEventUsage("api-calls", -5))
+
+				assert.Equal(t, rulesengine.ErrorNegativePreflightUsage, err)
+				assert.Equal(t, rulesengine.ErrorNegativePreflightUsage, result.Err)
+			})
+
+			t.Run("Rejects negative WithCreditCost", func(t *testing.T) {
+				company := createTestCompany()
+				flag := createTestFlag()
+
+				result, err := rulesengine.CheckFlag(ctx, company, nil, flag, rulesengine.WithCreditCost("credit-abc", -0.5))
+
+				assert.Equal(t, rulesengine.ErrorNegativePreflightCreditCost, err)
+				assert.Equal(t, rulesengine.ErrorNegativePreflightCreditCost, result.Err)
+			})
+
+			t.Run("Accepts zero values", func(t *testing.T) {
+				company := createTestCompany()
+				flag := createTestFlag()
+
+				result, err := rulesengine.CheckFlag(
+					ctx, company, nil, flag,
+					rulesengine.WithUsage(0),
+					rulesengine.WithEventUsage("api-calls", 0),
+					rulesengine.WithCreditCost("credit-abc", 0),
+				)
+
+				assert.NoError(t, err)
+				assert.Nil(t, result.Err)
+			})
+		})
+
+		t.Run("WithCreditCost gates credit balance directly", func(t *testing.T) {
+			// Balance 100, rate 1 (would pass alone), credit_cost 50 → 100 >= 50 → true
+			company := createTestCompany()
+			creditID := "credit-abc"
+			company.CreditBalances = map[string]float64{creditID: 100.0}
+
+			flag, rule := creditFlag(creditID, 1.0, nil)
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag, rulesengine.WithCreditCost(creditID, 50.0))
+
+			assert.NoError(t, err)
+			assert.Equal(t, &rule.ID, result.RuleID)
+		})
+
+		t.Run("WithCreditCost fails when balance < cost", func(t *testing.T) {
+			// Balance 10, consumption_rate 1 (would pass), cost 50 → 10 < 50 → false
+			company := createTestCompany()
+			creditID := "credit-abc"
+			company.CreditBalances = map[string]float64{creditID: 10.0}
+
+			flag, _ := creditFlag(creditID, 1.0, nil)
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag, rulesengine.WithCreditCost(creditID, 50.0))
+
+			assert.NoError(t, err)
+			assert.Nil(t, result.RuleID)
+		})
+
+		t.Run("WithCreditCost ignores unrelated credit_id keys", func(t *testing.T) {
+			// credit_cost has a different credit_id → engine falls through to rate.
+			company := createTestCompany()
+			creditID := "credit-abc"
+			company.CreditBalances = map[string]float64{creditID: 5.0}
+
+			flag, rule := creditFlag(creditID, 1.0, nil)
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag, rulesengine.WithCreditCost("credit-other", 9999))
+
+			assert.NoError(t, err)
+			assert.Equal(t, &rule.ID, result.RuleID)
+		})
+
+		t.Run("WithUsage multiplies by consumption_rate on credit balance", func(t *testing.T) {
+			// usage 50, rate 0.0001 → 0.005 credits needed, balance 1.0 → true
+			company := createTestCompany()
+			creditID := "credit-abc"
+			company.CreditBalances = map[string]float64{creditID: 1.0}
+
+			flag, rule := creditFlag(creditID, 0.0001, nil)
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag, rulesengine.WithUsage(50))
+
+			assert.NoError(t, err)
+			assert.Equal(t, &rule.ID, result.RuleID)
+		})
+
+		t.Run("WithUsage fails credit balance when product exceeds balance", func(t *testing.T) {
+			// usage 20_000, rate 0.0001 → 2 credits needed, balance 1.0 → false
+			company := createTestCompany()
+			creditID := "credit-abc"
+			company.CreditBalances = map[string]float64{creditID: 1.0}
+
+			flag, _ := creditFlag(creditID, 0.0001, nil)
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag, rulesengine.WithUsage(20_000))
+
+			assert.NoError(t, err)
+			assert.Nil(t, result.RuleID)
+		})
+
+		t.Run("WithEventUsage with matching subtype on credit balance", func(t *testing.T) {
+			// quantity 100, rate 0.05 → 5 credits needed, balance 10 → true
+			company := createTestCompany()
+			creditID := "credit-abc"
+			eventSubtype := "api-calls"
+			company.CreditBalances = map[string]float64{creditID: 10.0}
+
+			flag, rule := creditFlag(creditID, 0.05, &eventSubtype)
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag, rulesengine.WithEventUsage(eventSubtype, 100))
+
+			assert.NoError(t, err)
+			assert.Equal(t, &rule.ID, result.RuleID)
+		})
+
+		t.Run("WithEventUsage with non-matching subtype falls through", func(t *testing.T) {
+			// event_usage is keyed to "other-events" but condition is "api-calls".
+			// Falls through to balance >= consumption_rate: 5 >= 1 → true.
+			company := createTestCompany()
+			creditID := "credit-abc"
+			eventSubtype := "api-calls"
+			company.CreditBalances = map[string]float64{creditID: 5.0}
+
+			flag, rule := creditFlag(creditID, 1.0, &eventSubtype)
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag, rulesengine.WithEventUsage("other-events", 9999))
+
+			assert.NoError(t, err)
+			assert.Equal(t, &rule.ID, result.RuleID)
+		})
+
+		t.Run("WithEventUsage preferred over WithUsage on credit balance", func(t *testing.T) {
+			// event_usage matches subtype → 5 × 1 = 5 needed, balance 10 → true.
+			// usage 1M × 1 = 1M would fail. event_usage must win.
+			company := createTestCompany()
+			creditID := "credit-abc"
+			eventSubtype := "api-calls"
+			company.CreditBalances = map[string]float64{creditID: 10.0}
+
+			flag, rule := creditFlag(creditID, 1.0, &eventSubtype)
+
+			result, err := rulesengine.CheckFlag(
+				ctx, company, nil, flag,
+				rulesengine.WithUsage(1_000_000),
+				rulesengine.WithEventUsage(eventSubtype, 5),
+			)
+
+			assert.NoError(t, err)
+			assert.Equal(t, &rule.ID, result.RuleID, "event_usage match should win over generic usage on credit balance")
+		})
+
+		t.Run("WithCreditCost takes precedence over WithUsage", func(t *testing.T) {
+			// credit_cost says 5 (passes); usage 1M × 0.05 = 50K (would fail).
+			// credit_cost should short-circuit and pass.
+			company := createTestCompany()
+			creditID := "credit-abc"
+			company.CreditBalances = map[string]float64{creditID: 10.0}
+
+			flag, rule := creditFlag(creditID, 0.05, nil)
+
+			result, err := rulesengine.CheckFlag(
+				ctx, company, nil, flag,
+				rulesengine.WithCreditCost(creditID, 5.0),
+				rulesengine.WithUsage(1_000_000),
+			)
+
+			assert.NoError(t, err)
+			assert.Equal(t, &rule.ID, result.RuleID)
+		})
+
+		t.Run("WithCreditCost takes precedence over WithEventUsage", func(t *testing.T) {
+			// credit_cost says 5 (passes); event_usage 1M × 0.05 = 50K (would fail).
+			// credit_cost should short-circuit and pass.
+			company := createTestCompany()
+			creditID := "credit-abc"
+			eventSubtype := "api-calls"
+			company.CreditBalances = map[string]float64{creditID: 10.0}
+
+			flag, rule := creditFlag(creditID, 0.05, &eventSubtype)
+
+			result, err := rulesengine.CheckFlag(
+				ctx, company, nil, flag,
+				rulesengine.WithCreditCost(creditID, 5.0),
+				rulesengine.WithEventUsage(eventSubtype, 1_000_000),
+			)
+
+			assert.NoError(t, err)
+			assert.Equal(t, &rule.ID, result.RuleID, "credit_cost should short-circuit event_usage")
+		})
+
+		t.Run("WithUsage flips metric condition to false", func(t *testing.T) {
+			// metric value 5, limit 10 → 5 <= 10 → true. With usage=10 → 15 > 10 → false.
+			company := createTestCompany()
+
+			rule := createTestRule()
+			condition := createTestCondition(rulesengine.ConditionTypeMetric)
+			condition.Operator = typeconvert.ComparableOperatorLte
+			limit := int64(10)
+			condition.MetricValue = &limit
+			rule.Conditions = []*rulesengine.Condition{condition}
+
+			metric := createTestMetric(company, *condition.EventSubtype, *condition.MetricPeriod, 5)
+			company.Metrics = append(company.Metrics, metric)
+
+			flag := createTestFlag()
+			flag.DefaultValue = false
+			flag.Rules = []*rulesengine.Rule{rule}
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag, rulesengine.WithUsage(10))
+
+			assert.NoError(t, err)
+			assert.Nil(t, result.RuleID, "usage should push metric over the limit")
+		})
+
+		t.Run("WithEventUsage preferred over WithUsage on metric", func(t *testing.T) {
+			// event_usage matches subtype → uses 10 (push over). usage 1 ignored.
+			company := createTestCompany()
+
+			rule := createTestRule()
+			condition := createTestCondition(rulesengine.ConditionTypeMetric)
+			condition.Operator = typeconvert.ComparableOperatorLte
+			limit := int64(10)
+			condition.MetricValue = &limit
+			rule.Conditions = []*rulesengine.Condition{condition}
+
+			metric := createTestMetric(company, *condition.EventSubtype, *condition.MetricPeriod, 5)
+			company.Metrics = append(company.Metrics, metric)
+
+			flag := createTestFlag()
+			flag.DefaultValue = false
+			flag.Rules = []*rulesengine.Rule{rule}
+
+			result, err := rulesengine.CheckFlag(
+				ctx, company, nil, flag,
+				rulesengine.WithUsage(1),
+				rulesengine.WithEventUsage(*condition.EventSubtype, 10),
+			)
+
+			assert.NoError(t, err)
+			assert.Nil(t, result.RuleID, "event_usage match should win over usage")
+		})
+
+		t.Run("WithUsage flips int trait condition to false", func(t *testing.T) {
+			// trait 5, limit 10 → 5 <= 10 → true. With usage=10 → 15 > 10 → false.
+			company := createTestCompany()
+
+			rule := createTestRule()
+			condition := createTestCondition(rulesengine.ConditionTypeTrait)
+			condition.Operator = typeconvert.ComparableOperatorLte
+			condition.TraitValue = "10"
+			rule.Conditions = []*rulesengine.Condition{condition}
+
+			company.Traits = append(company.Traits, createTestTrait("5", condition.TraitDefinition))
+
+			flag := createTestFlag()
+			flag.DefaultValue = false
+			flag.Rules = []*rulesengine.Rule{rule}
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag, rulesengine.WithUsage(10))
+
+			assert.NoError(t, err)
+			assert.Nil(t, result.RuleID, "usage should push int trait over limit")
 		})
 	})
 }

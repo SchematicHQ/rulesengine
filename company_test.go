@@ -1,6 +1,7 @@
 package rulesengine_test
 
 import (
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -64,7 +65,7 @@ func TestCompanyAddMetric(t *testing.T) {
 				defer wg.Done()
 
 				// Create a metric with a unique event subtype to avoid collision
-				uniqueSubtype := "test-event-" + time.Now().String() + "-" + string(rune(index))
+				uniqueSubtype := "test-event-" + time.Now().String() + "-" + strconv.Itoa(index)
 				metric := createTestMetric(company, uniqueSubtype, rulesengine.MetricPeriodAllTime, int64(index))
 
 				// Add the metric
