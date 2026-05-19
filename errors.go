@@ -26,3 +26,5 @@ func newRulesEngineError(err string, status int) error {
 
 var ErrorUnexpected = newRulesEngineError("unexpected error", http.StatusInternalServerError)
 var ErrorFlagNotFound = newRulesEngineError("flag not found", http.StatusNotFound)
+var ErrorNegativePreflightUsage = newRulesEngineError("preflight usage cannot be negative", http.StatusBadRequest)
+var ErrorNegativePreflightCreditCost = newRulesEngineError("preflight credit cost cannot be negative", http.StatusBadRequest)
