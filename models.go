@@ -1,6 +1,7 @@
 package rulesengine
 
 import (
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -14,25 +15,25 @@ type TraitDefinition struct {
 }
 
 type Flag struct {
-	ID            string  `json:"id"`
-	AccountID     string  `json:"account_id"`
-	EnvironmentID string  `json:"environment_id"`
-	Key           string  `json:"key"`
-	Rules         []*Rule `json:"rules"`
-	DefaultValue  bool    `json:"default_value"`
+	ID            string           `json:"id"`
+	AccountID     string           `json:"account_id"`
+	EnvironmentID string           `json:"environment_id"`
+	Key           string           `json:"key"`
+	Rules         JSONSlice[*Rule] `json:"rules"`
+	DefaultValue  bool             `json:"default_value"`
 }
 
 type Rule struct {
-	ID              string            `json:"id"`
-	FlagID          *string           `json:"flag_id"`
-	AccountID       string            `json:"account_id"`
-	EnvironmentID   string            `json:"environment_id"`
-	RuleType        RuleType          `json:"rule_type" binding:"oneof=default global_override company_override company_override_usage_exceeded plan_entitlement plan_entitlement_usage_exceeded standard"`
-	Name            string            `json:"name"`
-	Priority        int64             `json:"priority"`
-	Conditions      []*Condition      `json:"conditions"`
-	ConditionGroups []*ConditionGroup `json:"condition_groups"`
-	Value           bool              `json:"value"`
+	ID              string                     `json:"id"`
+	FlagID          *string                    `json:"flag_id"`
+	AccountID       string                     `json:"account_id"`
+	EnvironmentID   string                     `json:"environment_id"`
+	RuleType        RuleType                   `json:"rule_type" binding:"oneof=default global_override company_override company_override_usage_exceeded plan_entitlement plan_entitlement_usage_exceeded standard"`
+	Name            string                     `json:"name"`
+	Priority        int64                      `json:"priority"`
+	Conditions      JSONSlice[*Condition]      `json:"conditions"`
+	ConditionGroups JSONSlice[*ConditionGroup] `json:"condition_groups"`
+	Value           bool                       `json:"value"`
 }
 
 type Condition struct {
@@ -43,7 +44,7 @@ type Condition struct {
 	Operator      typeconvert.ComparableOperator `json:"operator" binding:"oneof=eq ne gt lt gte lte is_empty not_empty"`
 
 	// Fields relevant when ConditionType is one of Company, User, Plan, Plan Version, Base Plan, Billing Product, or Billing Credit
-	ResourceIDs []string `json:"resource_ids"`
+	ResourceIDs JSONSlice[string] `json:"resource_ids"`
 
 	// Fields relevant when ConditionType = Event
 	EventSubtype           *string                 `json:"event_subtype"`
@@ -64,7 +65,7 @@ type Condition struct {
 }
 
 type ConditionGroup struct {
-	Conditions []*Condition `json:"conditions"`
+	Conditions JSONSlice[*Condition] `json:"conditions"`
 }
 
 // Evaluation objects
@@ -82,6 +83,16 @@ type CompanyMetric struct {
 }
 
 type CompanyMetricCollection []*CompanyMetric
+
+// MarshalJSON ensures a nil collection serializes as `[]` rather than
+// `null`, matching the JSONSlice contract that the rest of the wire types
+// in this package follow.
+func (c CompanyMetricCollection) MarshalJSON() ([]byte, error) {
+	if c == nil {
+		return []byte("[]"), nil
+	}
+	return json.Marshal([]*CompanyMetric(c))
+}
 
 func (c CompanyMetricCollection) Find(
 	eventSubtype string,
@@ -145,17 +156,17 @@ type Company struct {
 	AccountID     string `json:"account_id"`
 	EnvironmentID string `json:"environment_id"`
 
-	BasePlanID        *string                 `json:"base_plan_id"`
-	BillingProductIDs []string                `json:"billing_product_ids"`
-	CreditBalances    map[string]float64      `json:"credit_balances"`
-	Entitlements      []*FeatureEntitlement   `json:"entitlements,omitempty"`
-	Keys              map[string]string       `json:"keys"`
-	Metrics           CompanyMetricCollection `json:"metrics"`
-	PlanIDs           []string                `json:"plan_ids"`
-	PlanVersionIDs    []string                `json:"plan_version_ids"`
-	Rules             []*Rule                 `json:"rules"`
-	Subscription      *Subscription           `json:"subscription"`
-	Traits            []*Trait                `json:"traits"`
+	BasePlanID        *string                        `json:"base_plan_id"`
+	BillingProductIDs JSONSlice[string]              `json:"billing_product_ids"`
+	CreditBalances    map[string]float64             `json:"credit_balances"`
+	Entitlements      JSONSlice[*FeatureEntitlement] `json:"entitlements,omitempty"`
+	Keys              map[string]string              `json:"keys"`
+	Metrics           CompanyMetricCollection        `json:"metrics"`
+	PlanIDs           JSONSlice[string]              `json:"plan_ids"`
+	PlanVersionIDs    JSONSlice[string]              `json:"plan_version_ids"`
+	Rules             JSONSlice[*Rule]               `json:"rules"`
+	Subscription      *Subscription                  `json:"subscription"`
+	Traits            JSONSlice[*Trait]              `json:"traits"`
 
 	mu sync.Mutex `json:"-"` // mutex for thread safety
 }
@@ -215,6 +226,6 @@ type User struct {
 	EnvironmentID string `json:"environment_id"`
 
 	Keys   map[string]string `json:"keys"`
-	Traits []*Trait          `json:"traits"`
-	Rules  []*Rule           `json:"rules"`
+	Traits JSONSlice[*Trait] `json:"traits"`
+	Rules  JSONSlice[*Rule]  `json:"rules"`
 }
