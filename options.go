@@ -47,10 +47,8 @@ type checkFlagOptions struct {
 	// metric conditions whose event_subtype matches (quantity is added to
 	// the current metric value) and to credit-balance conditions whose
 	// event_subtype matches (compared as `quantity × consumption_rate`
-	// against the balance). Deliberately singular: one check preflights one
-	// action, and per-condition gating doesn't aggregate costs across
-	// subtypes, so multiple pairs against the same credit balance could
-	// each pass while the combined cost overdraws.
+	// against the balance). Deliberately singular: one check preflights
+	// one action.
 	eventUsage *eventUsage
 }
 
