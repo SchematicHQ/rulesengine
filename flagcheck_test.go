@@ -1156,6 +1156,37 @@ func TestCheckFlag(t *testing.T) {
 			assert.Nil(t, result.RuleID, "event_usage match should win over usage")
 		})
 
+		t.Run("WithEventUsage=0 falls through to WithUsage on metric", func(t *testing.T) {
+			// event_usage[subtype]=0 must NOT shadow usage. metric=5, usage=10
+			// → left=15 > limit=10 → false. The `ok && quantity > 0` guard in
+			// checkMetricCondition is what keeps usage in play when the
+			// event_usage entry is explicitly zero. Mirrored on rulesengine-rust.
+			company := createTestCompany()
+
+			rule := createTestRule()
+			condition := createTestCondition(rulesengine.ConditionTypeMetric)
+			condition.Operator = typeconvert.ComparableOperatorLte
+			limit := int64(10)
+			condition.MetricValue = &limit
+			rule.Conditions = []*rulesengine.Condition{condition}
+
+			metric := createTestMetric(company, *condition.EventSubtype, *condition.MetricPeriod, 5)
+			company.Metrics = append(company.Metrics, metric)
+
+			flag := createTestFlag()
+			flag.DefaultValue = false
+			flag.Rules = []*rulesengine.Rule{rule}
+
+			result, err := rulesengine.CheckFlag(
+				ctx, company, nil, flag,
+				rulesengine.WithEventUsage(*condition.EventSubtype, 0),
+				rulesengine.WithUsage(10),
+			)
+
+			assert.NoError(t, err)
+			assert.Nil(t, result.RuleID, "event_usage=0 must fall through to usage, pushing metric over the limit")
+		})
+
 		t.Run("WithUsage flips int trait condition to false", func(t *testing.T) {
 			// trait 5, limit 10 → 5 <= 10 → true. With usage=10 → 15 > 10 → false.
 			company := createTestCompany()
