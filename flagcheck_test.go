@@ -1045,6 +1045,27 @@ func TestCheckFlag(t *testing.T) {
 			assert.Equal(t, &rule.ID, result.RuleID)
 		})
 
+		t.Run("Repeated WithEventUsage replaces the previous pair", func(t *testing.T) {
+			// Last write wins (matching WithUsage): the surviving pair is
+			// ("api-calls", 100) → 100 × 0.05 = 5 needed, balance 10 → true.
+			// If the earlier ("api-calls", 1M) entry survived, the check
+			// would fail.
+			company := createTestCompany()
+			creditID := "credit-abc"
+			eventSubtype := "api-calls"
+			company.CreditBalances = map[string]float64{creditID: 10.0}
+
+			flag, rule := creditFlag(creditID, 0.05, &eventSubtype)
+
+			result, err := rulesengine.CheckFlag(ctx, company, nil, flag,
+				rulesengine.WithEventUsage(eventSubtype, 1_000_000),
+				rulesengine.WithEventUsage(eventSubtype, 100),
+			)
+
+			assert.NoError(t, err)
+			assert.Equal(t, &rule.ID, result.RuleID)
+		})
+
 		t.Run("WithEventUsage preferred over WithUsage on credit balance", func(t *testing.T) {
 			// event_usage matches subtype → 5 × 1 = 5 needed, balance 10 → true.
 			// usage 1M × 1 = 1M would fail. event_usage must win.
