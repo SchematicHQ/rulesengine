@@ -149,6 +149,8 @@ type FeatureEntitlement struct {
 	CreditTotal     *float64                `json:"credit_total" desc:"If the company has a credit-based entitlement for this feature, the total credit amount"`
 	CreditUsed      *float64                `json:"credit_used" desc:"If the company has a credit-based entitlement for this feature, the amount of credit used"`
 	CreditRemaining *float64                `json:"credit_remaining" desc:"If the company has a credit-based entitlement for this feature, the remaining credit amount"`
+	CreditReserved  *float64                `json:"credit_reserved,omitempty" desc:"If the company has a credit-based entitlement for this feature, the amount currently held by an open lease (granted minus tracked)"`
+	CreditSettled   *float64                `json:"credit_settled,omitempty" desc:"If the company has a credit-based entitlement for this feature, the spendable balance including open lease holds (remaining plus reserved)"`
 }
 
 type Company struct {
