@@ -24,10 +24,10 @@ type CheckFlagOption func(*checkFlagOptions)
 //
 // Callers can provide multiple options; the engine picks the most specific
 // one for each condition it evaluates. For credit-balance conditions:
-// CreditCost (keyed by credit_id) wins over EventUsage (keyed by
-// event_subtype) wins over Usage (generic). For metric conditions:
-// EventUsage wins over Usage when the subtype matches. Trait conditions
-// only ever use Usage.
+// CreditCost (keyed by credit_id) wins over EventUsage (when its subtype
+// matches) wins over Usage (generic). For metric conditions: EventUsage
+// wins over Usage when the subtype matches. Trait conditions only ever
+// use Usage.
 type checkFlagOptions struct {
 	// creditCost is keyed by billing_credit_id → a per-call cost in credits
 	// the caller has already computed. When a credit-balance condition
@@ -43,13 +43,21 @@ type checkFlagOptions struct {
 	// disambiguate across event subtypes.
 	usage *int64
 
-	// eventUsage is keyed by event_subtype → simulated quantity. Lets the
-	// caller target a specific subtype when several may be in flight.
-	// Applied to metric conditions whose event_subtype matches (quantity is
-	// added to the current metric value) and to credit-balance conditions
-	// whose event_subtype matches (compared as `quantity × consumption_rate`
-	// against the balance).
-	eventUsage map[string]int64
+	// eventUsage is a single (event_subtype, quantity) pair. Applied to
+	// metric conditions whose event_subtype matches (quantity is added to
+	// the current metric value) and to credit-balance conditions whose
+	// event_subtype matches (compared as `quantity × consumption_rate`
+	// against the balance). Deliberately singular: one check preflights one
+	// action, and per-condition gating doesn't aggregate costs across
+	// subtypes, so multiple pairs against the same credit balance could
+	// each pass while the combined cost overdraws.
+	eventUsage *eventUsage
+}
+
+// eventUsage pairs an event_subtype with a simulated quantity for preflight.
+type eventUsage struct {
+	eventSubtype string
+	quantity     int64
 }
 
 // newCheckFlagOptions returns a zero-valued checkFlagOptions with its maps
@@ -57,7 +65,6 @@ type checkFlagOptions struct {
 func newCheckFlagOptions() *checkFlagOptions {
 	return &checkFlagOptions{
 		creditCost: make(map[string]float64),
-		eventUsage: make(map[string]int64),
 	}
 }
 
@@ -69,10 +76,8 @@ func (o *checkFlagOptions) validate() error {
 	if o.usage != nil && *o.usage < 0 {
 		return ErrorNegativePreflightUsage
 	}
-	for _, q := range o.eventUsage {
-		if q < 0 {
-			return ErrorNegativePreflightUsage
-		}
+	if o.eventUsage != nil && o.eventUsage.quantity < 0 {
+		return ErrorNegativePreflightUsage
 	}
 	for _, c := range o.creditCost {
 		if c < 0 {
@@ -119,9 +124,11 @@ func WithUsage(quantity int64) CheckFlagOption {
 // event_subtype matches (compared as `quantity × consumption_rate` against
 // the balance). Preferred over WithUsage on those conditions when the
 // caller knows the specific subtype. Zero is a no-op; negative quantities
-// are rejected by CheckFlag with ErrorNegativePreflightUsage.
+// are rejected by CheckFlag with ErrorNegativePreflightUsage. Calling this
+// more than once replaces the previous pair (last write wins, matching
+// WithUsage).
 func WithEventUsage(eventSubtype string, quantity int64) CheckFlagOption {
 	return func(o *checkFlagOptions) {
-		o.eventUsage[eventSubtype] = quantity
+		o.eventUsage = &eventUsage{eventSubtype: eventSubtype, quantity: quantity}
 	}
 }

@@ -19,7 +19,7 @@ type CheckScope struct {
 	// behavior on every condition check.
 	creditCost map[string]float64
 	usage      *int64
-	eventUsage map[string]int64
+	eventUsage *eventUsage
 }
 
 type CheckResult struct {
@@ -151,8 +151,9 @@ func (s *RuleCheckService) checkCreditBalanceCondition(ctx context.Context, scop
 	// options supplied falls through to the legacy single-unit check.
 	//   1. creditCost[credit_id]: caller-supplied per-call cost in credits;
 	//      gate on balance >= cost.
-	//   2. eventUsage[condition.EventSubtype]: simulated quantity for this
-	//      specific event; gate on balance >= quantity × consumption_rate.
+	//   2. eventUsage, when its event_subtype matches the condition's:
+	//      simulated quantity for this specific event; gate on
+	//      balance >= quantity × consumption_rate.
 	//   3. usage: generic quantity (no event disambiguation); gate on
 	//      balance >= quantity × consumption_rate.
 	//   4. Legacy: balance >= consumption_rate (single unit).
@@ -160,10 +161,9 @@ func (s *RuleCheckService) checkCreditBalanceCondition(ctx context.Context, scop
 		return creditBalance >= cost, nil
 	}
 
-	if condition.EventSubtype != nil {
-		if quantity, ok := scope.eventUsage[*condition.EventSubtype]; ok && quantity > 0 {
-			return creditBalance >= float64(quantity)*consumptionRate, nil
-		}
+	if eu := scope.eventUsage; eu != nil && condition.EventSubtype != nil &&
+		eu.eventSubtype == *condition.EventSubtype && eu.quantity > 0 {
+		return creditBalance >= float64(eu.quantity)*consumptionRate, nil
 	}
 
 	if scope.usage != nil && *scope.usage > 0 {
@@ -254,10 +254,10 @@ func (s *RuleCheckService) checkMetricCondition(
 	}
 
 	// Preflight: simulate additional usage on top of the current metric value.
-	// eventUsage takes precedence over usage so a caller can target a specific
-	// subtype when several may be in flight.
-	if quantity, ok := scope.eventUsage[*condition.EventSubtype]; ok && quantity > 0 {
-		leftVal += quantity
+	// eventUsage takes precedence over usage when its subtype matches the
+	// condition's.
+	if eu := scope.eventUsage; eu != nil && eu.eventSubtype == *condition.EventSubtype && eu.quantity > 0 {
+		leftVal += eu.quantity
 	} else if scope.usage != nil && *scope.usage > 0 {
 		leftVal += *scope.usage
 	}
