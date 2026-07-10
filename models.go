@@ -153,6 +153,15 @@ type FeatureEntitlement struct {
 	SoftLimit       *int64                  `json:"soft_limit" desc:"For usage-based pricing, the soft limit for overage charges or the next tier boundary"`
 	Usage           *int64                  `json:"usage" desc:"If the company has a numeric entitlement for this feature, the current usage amount"`
 	ValueType       EntitlementValueType    `json:"value_type" binding:"oneof=boolean credit numeric trait unknown unlimited" desc:"The type of the entitlement value"`
+	WarningTiers    JSONSlice[*WarningTier] `json:"warning_tiers,omitempty" desc:"Customer-defined usage warning thresholds configured on this entitlement"`
+}
+
+// WarningTier is a customer-defined usage warning threshold on a feature
+// entitlement. Key is a customer label identifying the tier; Value is the
+// threshold, expressed in the entitlement's usage units.
+type WarningTier struct {
+	Key   string `json:"key" desc:"A customer-defined identifier for the warning tier"`
+	Value int64  `json:"value" desc:"The warning threshold, in the entitlement's usage units"`
 }
 
 type Company struct {
