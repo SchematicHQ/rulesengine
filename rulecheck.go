@@ -147,6 +147,18 @@ func (s *RuleCheckService) checkCreditBalanceCondition(ctx context.Context, scop
 		}
 	}
 
+	// SCHX-582: with overage enabled the balance no longer gates the check —
+	// consumption continues past zero and accrues at the configured rate, so
+	// every branch below (all of which compare against the balance) would ask
+	// the wrong question. There is no cap in the current design, so once overage
+	// is on there is nothing further to compare against.
+	//
+	// Mirrors check_credit_balance_condition in rulesengine-rust; the two must
+	// agree (see SCHY-515) until the Go engine is retired.
+	if scope.Company.CreditOverageEnabled[*condition.CreditID] {
+		return true, nil
+	}
+
 	// Precedence on credit-balance conditions, most specific first. No
 	// options supplied falls through to the legacy single-unit check.
 	//   1. creditCost[credit_id]: caller-supplied per-call cost in credits;
