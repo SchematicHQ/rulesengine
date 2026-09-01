@@ -169,17 +169,24 @@ type Company struct {
 	AccountID     string `json:"account_id"`
 	EnvironmentID string `json:"environment_id"`
 
-	BasePlanID        *string                        `json:"base_plan_id"`
-	BillingProductIDs JSONSlice[string]              `json:"billing_product_ids"`
-	CreditBalances    map[string]float64             `json:"credit_balances"`
-	Entitlements      JSONSlice[*FeatureEntitlement] `json:"entitlements,omitempty"`
-	Keys              map[string]string              `json:"keys"`
-	Metrics           CompanyMetricCollection        `json:"metrics"`
-	PlanIDs           JSONSlice[string]              `json:"plan_ids"`
-	PlanVersionIDs    JSONSlice[string]              `json:"plan_version_ids"`
-	Rules             JSONSlice[*Rule]               `json:"rules"`
-	Subscription      *Subscription                  `json:"subscription"`
-	Traits            JSONSlice[*Trait]              `json:"traits"`
+	BasePlanID        *string            `json:"base_plan_id"`
+	BillingProductIDs JSONSlice[string]  `json:"billing_product_ids"`
+	CreditBalances    map[string]float64 `json:"credit_balances"`
+	// CreditOverageEnabled is the per-credit overage opt-in (SCHX-582), keyed by
+	// billing credit ID — the same key CreditBalances uses. When true for a
+	// credit, consumption continues past a zero balance and accrues against an
+	// overage rate rather than being denied, so the balance stops gating the
+	// check. Absent or false is the historical behaviour, so a caller that does
+	// not send the field keeps hard-stopping at zero.
+	CreditOverageEnabled map[string]bool                `json:"credit_overage_enabled"`
+	Entitlements         JSONSlice[*FeatureEntitlement] `json:"entitlements,omitempty"`
+	Keys                 map[string]string              `json:"keys"`
+	Metrics              CompanyMetricCollection        `json:"metrics"`
+	PlanIDs              JSONSlice[string]              `json:"plan_ids"`
+	PlanVersionIDs       JSONSlice[string]              `json:"plan_version_ids"`
+	Rules                JSONSlice[*Rule]               `json:"rules"`
+	Subscription         *Subscription                  `json:"subscription"`
+	Traits               JSONSlice[*Trait]              `json:"traits"`
 
 	mu sync.Mutex `json:"-"` // mutex for thread safety
 }
