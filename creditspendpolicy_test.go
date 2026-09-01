@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const spendCreditID = "bcrd_spendpolicy"
+const spendBalanceID = "bcrd_spendpolicy"
 
 // spendPolicyFlag builds a flag whose only rule is a credit-balance condition on
 // creditID, so a check exercises exactly the spend-policy gate.
@@ -32,7 +32,7 @@ func spendPolicyFlag(creditID string, consumptionRate float64) *rulesengine.Flag
 func perDrawPolicy(limit float64, scope rulesengine.CreditSpendPolicyScope) *rulesengine.CreditSpendPolicy {
 	return &rulesengine.CreditSpendPolicy{
 		ID:       "csp_" + string(scope),
-		CreditID: spendCreditID,
+		CreditID: spendBalanceID,
 		Kind:     rulesengine.CreditSpendPolicyKindPerDraw,
 		Scope:    scope,
 		Limit:    limit,
@@ -42,7 +42,7 @@ func perDrawPolicy(limit float64, scope rulesengine.CreditSpendPolicyScope) *rul
 func windowPolicy(limit float64, consumed float64) *rulesengine.CreditSpendPolicy {
 	return &rulesengine.CreditSpendPolicy{
 		ID:       "csp_window",
-		CreditID: spendCreditID,
+		CreditID: spendBalanceID,
 		Kind:     rulesengine.CreditSpendPolicyKindWindow,
 		Scope:    rulesengine.CreditSpendPolicyScopeCompany,
 		Limit:    limit,
@@ -54,7 +54,7 @@ func windowPolicy(limit float64, consumed float64) *rulesengine.CreditSpendPolic
 // companyWith returns a funded company carrying the given policies.
 func companyWith(policies ...*rulesengine.CreditSpendPolicy) *rulesengine.Company {
 	company := createTestCompany()
-	company.CreditBalances = map[string]float64{spendCreditID: 10000}
+	company.CreditBalances = map[string]float64{spendBalanceID: 10000}
 	company.CreditSpendPolicies = policies
 	return company
 }
@@ -82,7 +82,7 @@ func TestCreditSpendPolicyAllows(t *testing.T) {
 		{"window refuses a draw a per-draw cap would allow", windowPolicy(100, 95), 50, false, true},
 		{
 			name:          "an unrecognised kind is skipped rather than enforced",
-			policy:        &rulesengine.CreditSpendPolicy{CreditID: spendCreditID, Kind: "rolling_average", Limit: 1},
+			policy:        &rulesengine.CreditSpendPolicy{CreditID: spendBalanceID, Kind: "rolling_average", Limit: 1},
 			cost:          1000,
 			wantAllowed:   true,
 			wantEvaluated: false,
@@ -110,8 +110,8 @@ func TestCreditSpendPolicyCheckFlag(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("no policy leaves the check on the balance alone", func(t *testing.T) {
-		result, err := rulesengine.CheckFlag(ctx, companyWith(), nil, spendPolicyFlag(spendCreditID, 1),
-			rulesengine.WithCreditCost(spendCreditID, 50))
+		result, err := rulesengine.CheckFlag(ctx, companyWith(), nil, spendPolicyFlag(spendBalanceID, 1),
+			rulesengine.WithCreditCost(spendBalanceID, 50))
 
 		assert.NoError(t, err)
 		assert.True(t, result.Value)
@@ -121,8 +121,8 @@ func TestCreditSpendPolicyCheckFlag(t *testing.T) {
 	t.Run("a per-draw policy refuses an over-limit draw despite a funded balance", func(t *testing.T) {
 		policy := perDrawPolicy(10, rulesengine.CreditSpendPolicyScopeCompany)
 
-		result, err := rulesengine.CheckFlag(ctx, companyWith(policy), nil, spendPolicyFlag(spendCreditID, 1),
-			rulesengine.WithCreditCost(spendCreditID, 50))
+		result, err := rulesengine.CheckFlag(ctx, companyWith(policy), nil, spendPolicyFlag(spendBalanceID, 1),
+			rulesengine.WithCreditCost(spendBalanceID, 50))
 
 		assert.NoError(t, err)
 		assert.False(t, result.Value)
@@ -135,7 +135,7 @@ func TestCreditSpendPolicyCheckFlag(t *testing.T) {
 
 	t.Run("a window policy refuses once the period is spent", func(t *testing.T) {
 		result, err := rulesengine.CheckFlag(ctx, companyWith(windowPolicy(100, 95)), nil,
-			spendPolicyFlag(spendCreditID, 1), rulesengine.WithCreditCost(spendCreditID, 10))
+			spendPolicyFlag(spendBalanceID, 1), rulesengine.WithCreditCost(spendBalanceID, 10))
 
 		assert.NoError(t, err)
 		assert.False(t, result.Value)
@@ -147,7 +147,7 @@ func TestCreditSpendPolicyCheckFlag(t *testing.T) {
 	t.Run("a draw fitting every policy passes", func(t *testing.T) {
 		result, err := rulesengine.CheckFlag(ctx,
 			companyWith(perDrawPolicy(50, rulesengine.CreditSpendPolicyScopeCompany), windowPolicy(100, 20)),
-			nil, spendPolicyFlag(spendCreditID, 1), rulesengine.WithCreditCost(spendCreditID, 40))
+			nil, spendPolicyFlag(spendBalanceID, 1), rulesengine.WithCreditCost(spendBalanceID, 40))
 
 		assert.NoError(t, err)
 		assert.True(t, result.Value)
@@ -160,7 +160,7 @@ func TestCreditSpendPolicyCheckFlag(t *testing.T) {
 		// actually fails.
 		result, err := rulesengine.CheckFlag(ctx,
 			companyWith(perDrawPolicy(50, rulesengine.CreditSpendPolicyScopeCompany), windowPolicy(100, 95)),
-			nil, spendPolicyFlag(spendCreditID, 1), rulesengine.WithCreditCost(spendCreditID, 40))
+			nil, spendPolicyFlag(spendBalanceID, 1), rulesengine.WithCreditCost(spendBalanceID, 40))
 
 		assert.NoError(t, err)
 		assert.False(t, result.Value)
@@ -177,7 +177,7 @@ func TestCreditSpendPolicyCheckFlag(t *testing.T) {
 
 		result, err := rulesengine.CheckFlag(ctx,
 			companyWith(perDrawPolicy(500, rulesengine.CreditSpendPolicyScopeCompany)), user,
-			spendPolicyFlag(spendCreditID, 1), rulesengine.WithCreditCost(spendCreditID, 10))
+			spendPolicyFlag(spendBalanceID, 1), rulesengine.WithCreditCost(spendBalanceID, 10))
 
 		assert.NoError(t, err)
 		assert.False(t, result.Value)
@@ -187,8 +187,8 @@ func TestCreditSpendPolicyCheckFlag(t *testing.T) {
 	})
 
 	t.Run("a user policy does not bind a check with no user", func(t *testing.T) {
-		result, err := rulesengine.CheckFlag(ctx, companyWith(), nil, spendPolicyFlag(spendCreditID, 1),
-			rulesengine.WithCreditCost(spendCreditID, 10))
+		result, err := rulesengine.CheckFlag(ctx, companyWith(), nil, spendPolicyFlag(spendBalanceID, 1),
+			rulesengine.WithCreditCost(spendBalanceID, 10))
 
 		assert.NoError(t, err)
 		assert.True(t, result.Value)
@@ -198,8 +198,8 @@ func TestCreditSpendPolicyCheckFlag(t *testing.T) {
 		other := perDrawPolicy(1, rulesengine.CreditSpendPolicyScopeCompany)
 		other.CreditID = "bcrd_other"
 
-		result, err := rulesengine.CheckFlag(ctx, companyWith(other), nil, spendPolicyFlag(spendCreditID, 1),
-			rulesengine.WithCreditCost(spendCreditID, 50))
+		result, err := rulesengine.CheckFlag(ctx, companyWith(other), nil, spendPolicyFlag(spendBalanceID, 1),
+			rulesengine.WithCreditCost(spendBalanceID, 50))
 
 		assert.NoError(t, err)
 		assert.True(t, result.Value)
@@ -209,14 +209,14 @@ func TestCreditSpendPolicyCheckFlag(t *testing.T) {
 		// 4 units x 2 credits = 8, under the limit of 10.
 		allowed, err := rulesengine.CheckFlag(ctx,
 			companyWith(perDrawPolicy(10, rulesengine.CreditSpendPolicyScopeCompany)), nil,
-			spendPolicyFlag(spendCreditID, 2), rulesengine.WithUsage(4))
+			spendPolicyFlag(spendBalanceID, 2), rulesengine.WithUsage(4))
 		assert.NoError(t, err)
 		assert.True(t, allowed.Value)
 
 		// 6 units x 2 credits = 12, over it.
 		refused, err := rulesengine.CheckFlag(ctx,
 			companyWith(perDrawPolicy(10, rulesengine.CreditSpendPolicyScopeCompany)), nil,
-			spendPolicyFlag(spendCreditID, 2), rulesengine.WithUsage(6))
+			spendPolicyFlag(spendBalanceID, 2), rulesengine.WithUsage(6))
 		assert.NoError(t, err)
 		assert.False(t, refused.Value)
 		if assert.NotNil(t, refused.CreditSpendPolicy) {
@@ -227,7 +227,7 @@ func TestCreditSpendPolicyCheckFlag(t *testing.T) {
 	t.Run("a single-unit check is refused by a limit below the consumption rate", func(t *testing.T) {
 		result, err := rulesengine.CheckFlag(ctx,
 			companyWith(perDrawPolicy(1, rulesengine.CreditSpendPolicyScopeCompany)), nil,
-			spendPolicyFlag(spendCreditID, 5))
+			spendPolicyFlag(spendBalanceID, 5))
 
 		assert.NoError(t, err)
 		assert.False(t, result.Value)
@@ -239,22 +239,22 @@ func TestCreditSpendPolicyCheckFlag(t *testing.T) {
 	t.Run("a zero limit refuses every non-free draw", func(t *testing.T) {
 		refused, err := rulesengine.CheckFlag(ctx,
 			companyWith(perDrawPolicy(0, rulesengine.CreditSpendPolicyScopeCompany)), nil,
-			spendPolicyFlag(spendCreditID, 1), rulesengine.WithCreditCost(spendCreditID, 1))
+			spendPolicyFlag(spendBalanceID, 1), rulesengine.WithCreditCost(spendBalanceID, 1))
 		assert.NoError(t, err)
 		assert.False(t, refused.Value)
 
 		free, err := rulesengine.CheckFlag(ctx,
 			companyWith(perDrawPolicy(0, rulesengine.CreditSpendPolicyScopeCompany)), nil,
-			spendPolicyFlag(spendCreditID, 1), rulesengine.WithCreditCost(spendCreditID, 0))
+			spendPolicyFlag(spendBalanceID, 1), rulesengine.WithCreditCost(spendBalanceID, 0))
 		assert.NoError(t, err)
 		assert.True(t, free.Value)
 	})
 
 	t.Run("an unrecognised kind lets the draw through", func(t *testing.T) {
-		unknown := &rulesengine.CreditSpendPolicy{CreditID: spendCreditID, Kind: "rolling_average", Limit: 1}
+		unknown := &rulesengine.CreditSpendPolicy{CreditID: spendBalanceID, Kind: "rolling_average", Limit: 1}
 
-		result, err := rulesengine.CheckFlag(ctx, companyWith(unknown), nil, spendPolicyFlag(spendCreditID, 1),
-			rulesengine.WithCreditCost(spendCreditID, 500))
+		result, err := rulesengine.CheckFlag(ctx, companyWith(unknown), nil, spendPolicyFlag(spendBalanceID, 1),
+			rulesengine.WithCreditCost(spendBalanceID, 500))
 
 		assert.NoError(t, err)
 		assert.True(t, result.Value)
@@ -263,10 +263,10 @@ func TestCreditSpendPolicyCheckFlag(t *testing.T) {
 
 	t.Run("an insufficient balance still reports no rules matched", func(t *testing.T) {
 		company := companyWith(perDrawPolicy(100, rulesengine.CreditSpendPolicyScopeCompany))
-		company.CreditBalances = map[string]float64{spendCreditID: 1}
+		company.CreditBalances = map[string]float64{spendBalanceID: 1}
 
-		result, err := rulesengine.CheckFlag(ctx, company, nil, spendPolicyFlag(spendCreditID, 1),
-			rulesengine.WithCreditCost(spendCreditID, 50))
+		result, err := rulesengine.CheckFlag(ctx, company, nil, spendPolicyFlag(spendBalanceID, 1),
+			rulesengine.WithCreditCost(spendBalanceID, 50))
 
 		assert.NoError(t, err)
 		assert.False(t, result.Value)
@@ -275,7 +275,7 @@ func TestCreditSpendPolicyCheckFlag(t *testing.T) {
 	})
 
 	t.Run("a later matching rule wins over an earlier refusal", func(t *testing.T) {
-		flag := spendPolicyFlag(spendCreditID, 1)
+		flag := spendPolicyFlag(spendBalanceID, 1)
 		override := createTestRule()
 		override.RuleType = rulesengine.RuleTypeGlobalOverride
 		override.Value = true
@@ -283,7 +283,7 @@ func TestCreditSpendPolicyCheckFlag(t *testing.T) {
 
 		result, err := rulesengine.CheckFlag(ctx,
 			companyWith(perDrawPolicy(1, rulesengine.CreditSpendPolicyScopeCompany)), nil, flag,
-			rulesengine.WithCreditCost(spendCreditID, 50))
+			rulesengine.WithCreditCost(spendBalanceID, 50))
 
 		assert.NoError(t, err)
 		assert.True(t, result.Value)
