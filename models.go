@@ -169,17 +169,18 @@ type Company struct {
 	AccountID     string `json:"account_id"`
 	EnvironmentID string `json:"environment_id"`
 
-	BasePlanID        *string                        `json:"base_plan_id"`
-	BillingProductIDs JSONSlice[string]              `json:"billing_product_ids"`
-	CreditBalances    map[string]float64             `json:"credit_balances"`
-	Entitlements      JSONSlice[*FeatureEntitlement] `json:"entitlements,omitempty"`
-	Keys              map[string]string              `json:"keys"`
-	Metrics           CompanyMetricCollection        `json:"metrics"`
-	PlanIDs           JSONSlice[string]              `json:"plan_ids"`
-	PlanVersionIDs    JSONSlice[string]              `json:"plan_version_ids"`
-	Rules             JSONSlice[*Rule]               `json:"rules"`
-	Subscription      *Subscription                  `json:"subscription"`
-	Traits            JSONSlice[*Trait]              `json:"traits"`
+	BasePlanID          *string                        `json:"base_plan_id"`
+	BillingProductIDs   JSONSlice[string]              `json:"billing_product_ids"`
+	CreditBalances      map[string]float64             `json:"credit_balances"`
+	CreditSpendPolicies JSONSlice[*CreditSpendPolicy]  `json:"credit_spend_policies,omitempty"`
+	Entitlements        JSONSlice[*FeatureEntitlement] `json:"entitlements,omitempty"`
+	Keys                map[string]string              `json:"keys"`
+	Metrics             CompanyMetricCollection        `json:"metrics"`
+	PlanIDs             JSONSlice[string]              `json:"plan_ids"`
+	PlanVersionIDs      JSONSlice[string]              `json:"plan_version_ids"`
+	Rules               JSONSlice[*Rule]               `json:"rules"`
+	Subscription        *Subscription                  `json:"subscription"`
+	Traits              JSONSlice[*Trait]              `json:"traits"`
 
 	mu sync.Mutex `json:"-"` // mutex for thread safety
 }
@@ -238,7 +239,8 @@ type User struct {
 	AccountID     string `json:"account_id"`
 	EnvironmentID string `json:"environment_id"`
 
-	Keys   map[string]string `json:"keys"`
-	Traits JSONSlice[*Trait] `json:"traits"`
-	Rules  JSONSlice[*Rule]  `json:"rules"`
+	CreditSpendPolicies JSONSlice[*CreditSpendPolicy] `json:"credit_spend_policies,omitempty"`
+	Keys                map[string]string             `json:"keys"`
+	Traits              JSONSlice[*Trait]             `json:"traits"`
+	Rules               JSONSlice[*Rule]              `json:"rules"`
 }
