@@ -100,6 +100,10 @@ func TestCreditOverage(t *testing.T) {
 	// credit cost would otherwise re-impose the balance gate it short-circuits.
 	t.Run("overrides the credit cost option", func(t *testing.T) {
 		flag := createTestFlag()
+		// Pinned false: createTestFlag randomizes DefaultValue, and CheckFlag falls
+		// back to it when no rule matches — so a true default would let this pass
+		// without the rule ever matching.
+		flag.DefaultValue = false
 		flag.Rules = []*rulesengine.Rule{creditRule()}
 
 		result, err := rulesengine.CheckFlag(

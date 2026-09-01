@@ -172,9 +172,10 @@ type Company struct {
 	BasePlanID        *string            `json:"base_plan_id"`
 	BillingProductIDs JSONSlice[string]  `json:"billing_product_ids"`
 	CreditBalances    map[string]float64 `json:"credit_balances"`
-	// CreditOverageEnabled is the per-credit overage opt-in (SCHX-582). When true
-	// for a credit, consumption continues past a zero balance and accrues against
-	// an overage rate rather than being denied, so the balance stops gating the
+	// CreditOverageEnabled is the per-credit overage opt-in (SCHX-582), keyed by
+	// billing credit ID — the same key CreditBalances uses. When true for a
+	// credit, consumption continues past a zero balance and accrues against an
+	// overage rate rather than being denied, so the balance stops gating the
 	// check. Absent or false is the historical behaviour, so a caller that does
 	// not send the field keeps hard-stopping at zero.
 	CreditOverageEnabled map[string]bool                `json:"credit_overage_enabled"`
