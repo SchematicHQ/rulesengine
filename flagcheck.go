@@ -10,21 +10,22 @@ import (
 )
 
 type CheckFlagResult struct {
-	CompanyID           *string             `json:"company_id,omitempty"`
-	Err                 error               `json:"err,omitempty"`
-	Entitlement         *FeatureEntitlement `json:"entitlement,omitempty"`
-	FeatureAllocation   *int64              `json:"feature_allocation,omitempty"`
-	FeatureUsage        *int64              `json:"feature_usage,omitempty"`
-	FeatureUsageEvent   *string             `json:"feature_usage_event,omitempty"`
-	FeatureUsagePeriod  *MetricPeriod       `json:"feature_usage_period,omitempty" binding:"oneof=all_time current_day current_month current_week"`
-	FeatureUsageResetAt *time.Time          `json:"feature_usage_reset_at,omitempty"`
-	FlagID              *string             `json:"flag_id,omitempty"`
-	FlagKey             string              `json:"flag_key"`
-	Reason              string              `json:"reason"`
-	RuleID              *string             `json:"rule_id,omitempty"`
-	RuleType            *RuleType           `json:"rule_type,omitempty" binding:"oneof=default global_override company_override company_override_usage_exceeded plan_entitlement plan_entitlement_usage_exceeded standard"`
-	UserID              *string             `json:"user_id,omitempty"`
-	Value               bool                `json:"value"`
+	CompanyID           *string                  `json:"company_id,omitempty"`
+	Err                 error                    `json:"err,omitempty"`
+	Entitlement         *FeatureEntitlement      `json:"entitlement,omitempty"`
+	FeatureAllocation   *int64                   `json:"feature_allocation,omitempty"`
+	FeatureUsage        *int64                   `json:"feature_usage,omitempty"`
+	FeatureUsageEvent   *string                  `json:"feature_usage_event,omitempty"`
+	FeatureUsagePeriod  *MetricPeriod            `json:"feature_usage_period,omitempty" binding:"oneof=all_time current_day current_month current_week"`
+	FeatureUsageResetAt *time.Time               `json:"feature_usage_reset_at,omitempty"`
+	CreditSpendPolicy   *CreditSpendPolicyResult `json:"credit_spend_policy,omitempty"`
+	FlagID              *string                  `json:"flag_id,omitempty"`
+	FlagKey             string                   `json:"flag_key"`
+	Reason              string                   `json:"reason"`
+	RuleID              *string                  `json:"rule_id,omitempty"`
+	RuleType            *RuleType                `json:"rule_type,omitempty" binding:"oneof=default global_override company_override company_override_usage_exceeded plan_entitlement plan_entitlement_usage_exceeded standard"`
+	UserID              *string                  `json:"user_id,omitempty"`
+	Value               bool                     `json:"value"`
 }
 
 const (
@@ -36,6 +37,22 @@ const (
 	ReasonServerError         = "Server error; Schematic has been notified"
 	ReasonUserNotFound        = "User not found"
 )
+
+// ReasonCreditSpendPolicyExceeded replaces ReasonNoRulesMatched only when a
+// policy was what stopped an entitlement rule from matching.
+func ReasonCreditSpendPolicyExceeded(cost float64, policy *CreditSpendPolicy) string {
+	return fmt.Sprintf(
+		"A draw of %s credits exceeds the %s",
+		formatCreditAmount(cost), policy.Describe(),
+	)
+}
+
+// CreditSpendPolicyResult lets a caller tell a policy refusal from an empty
+// balance, and show the actor what bound it.
+type CreditSpendPolicyResult struct {
+	Cost   float64            `json:"cost" desc:"The cost of the draw the check was evaluated against"`
+	Policy *CreditSpendPolicy `json:"policy" desc:"The policy that refused the draw"`
+}
 
 func (r *CheckFlagResult) setRuleFields(company *Company, rule *Rule) {
 	if rule == nil {
@@ -168,6 +185,10 @@ func CheckFlag(
 			}
 		}
 	}
+	// Shared across every rule so an earlier refusal survives to the post-loop
+	// reason check below.
+	spendPolicy := &spendPolicyBlock{}
+
 	for _, group := range GroupRulesByPriority(flag.Rules, companyRules, userRules) {
 		for _, rule := range group {
 			if rule == nil {
@@ -175,12 +196,13 @@ func CheckFlag(
 			}
 
 			checkRuleResp, err := ruleChecker.Check(ctx, &CheckScope{
-				Company:    company,
-				Rule:       rule,
-				User:       user,
-				creditCost: options.creditCost,
-				usage:      options.usage,
-				eventUsage: options.eventUsage,
+				Company:     company,
+				Rule:        rule,
+				User:        user,
+				creditCost:  options.creditCost,
+				usage:       options.usage,
+				eventUsage:  options.eventUsage,
+				spendPolicy: spendPolicy,
 			})
 			if err != nil {
 				resp.Err = err
@@ -198,6 +220,16 @@ func CheckFlag(
 				resp.setRuleFields(company, rule)
 				return resp, nil
 			}
+		}
+	}
+
+	// Say so when a policy refused a credit condition along the way; the caller
+	// would otherwise read the generic no-rules reason and blame the balance.
+	if spendPolicy.policy != nil {
+		resp.Reason = ReasonCreditSpendPolicyExceeded(spendPolicy.cost, spendPolicy.policy)
+		resp.CreditSpendPolicy = &CreditSpendPolicyResult{
+			Cost:   spendPolicy.cost,
+			Policy: spendPolicy.policy,
 		}
 	}
 
