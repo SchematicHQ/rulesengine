@@ -178,15 +178,21 @@ type Company struct {
 	// overage rate rather than being denied, so the balance stops gating the
 	// check. Absent or false is the historical behaviour, so a caller that does
 	// not send the field keeps hard-stopping at zero.
-	CreditOverageEnabled map[string]bool                `json:"credit_overage_enabled"`
-	Entitlements         JSONSlice[*FeatureEntitlement] `json:"entitlements,omitempty"`
-	Keys                 map[string]string              `json:"keys"`
-	Metrics              CompanyMetricCollection        `json:"metrics"`
-	PlanIDs              JSONSlice[string]              `json:"plan_ids"`
-	PlanVersionIDs       JSONSlice[string]              `json:"plan_version_ids"`
-	Rules                JSONSlice[*Rule]               `json:"rules"`
-	Subscription         *Subscription                  `json:"subscription"`
-	Traits               JSONSlice[*Trait]              `json:"traits"`
+	CreditOverageEnabled map[string]bool `json:"credit_overage_enabled"`
+	// CreditOverageCaps is the optional ceiling on overage per credit, in
+	// credits, keyed the same way. It only means anything where
+	// CreditOverageEnabled is true. Present means the balance may run down to
+	// -cap before the check denies; absent means uncapped, which is the
+	// behaviour that shipped before caps existed.
+	CreditOverageCaps map[string]float64             `json:"credit_overage_caps"`
+	Entitlements      JSONSlice[*FeatureEntitlement] `json:"entitlements,omitempty"`
+	Keys              map[string]string              `json:"keys"`
+	Metrics           CompanyMetricCollection        `json:"metrics"`
+	PlanIDs           JSONSlice[string]              `json:"plan_ids"`
+	PlanVersionIDs    JSONSlice[string]              `json:"plan_version_ids"`
+	Rules             JSONSlice[*Rule]               `json:"rules"`
+	Subscription      *Subscription                  `json:"subscription"`
+	Traits            JSONSlice[*Trait]              `json:"traits"`
 
 	mu sync.Mutex `json:"-"` // mutex for thread safety
 }

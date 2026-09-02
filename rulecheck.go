@@ -147,16 +147,24 @@ func (s *RuleCheckService) checkCreditBalanceCondition(ctx context.Context, scop
 		}
 	}
 
-	// SCHX-582: with overage enabled the balance no longer gates the check —
-	// consumption continues past zero and accrues at the configured rate, so
-	// every branch below (all of which compare against the balance) would ask
-	// the wrong question. There is no cap in the current design, so once overage
-	// is on there is nothing further to compare against.
+	// SCHX-582: with overage enabled the check fails open past zero — the
+	// balance keeps being drawn and accrues at the configured rate — so the
+	// branches below, which all compare against a positive balance, would ask
+	// the wrong question.
+	//
+	// The cap moves the floor rather than removing it: the balance is allowed
+	// to run down to -cap, and the check denies beyond that. An absent cap is
+	// uncapped, which is what shipped before caps existed.
 	//
 	// Mirrors check_credit_balance_condition in rulesengine-rust; the two must
 	// agree (see SCHY-515) until the Go engine is retired.
 	if scope.Company.CreditOverageEnabled[*condition.CreditID] {
-		return true, nil
+		overageCap, capped := scope.Company.CreditOverageCaps[*condition.CreditID]
+		if !capped {
+			return true, nil
+		}
+
+		return creditBalance > -overageCap, nil
 	}
 
 	// Precedence on credit-balance conditions, most specific first. No

@@ -31,6 +31,13 @@ func TestCreditOverage(t *testing.T) {
 		return company
 	}
 
+	companyWithCap := func(balance float64, cap float64) *rulesengine.Company {
+		enabled := true
+		company := companyWith(balance, &enabled)
+		company.CreditOverageCaps = map[string]float64{creditID: cap}
+		return company
+	}
+
 	creditRule := func() *rulesengine.Rule {
 		rule := createTestRule()
 		condition := createTestCondition(rulesengine.ConditionTypeCredit)
@@ -115,5 +122,31 @@ func TestCreditOverage(t *testing.T) {
 		)
 		require.NoError(t, err)
 		assert.True(t, result.Value)
+	})
+
+	// SCHX-582 cap: the floor moves from zero to -cap rather than disappearing.
+	t.Run("allows while inside the cap", func(t *testing.T) {
+		assert.True(t, matches(t, companyWithCap(-40, 100)))
+	})
+
+	t.Run("denies once the cap is spent", func(t *testing.T) {
+		assert.False(t, matches(t, companyWithCap(-100, 100)))
+	})
+
+	t.Run("denies past the cap", func(t *testing.T) {
+		assert.False(t, matches(t, companyWithCap(-140, 100)))
+	})
+
+	// A cap on one credit must not bound a different one.
+	t.Run("cap does not leak across credits", func(t *testing.T) {
+		company := companyWithCap(-140, 100)
+		company.CreditOverageCaps = map[string]float64{"other-credit": 100}
+		assert.True(t, matches(t, company))
+	})
+
+	// Absent cap keeps the uncapped behaviour that shipped first.
+	t.Run("no cap means uncapped", func(t *testing.T) {
+		enabled := true
+		assert.True(t, matches(t, companyWith(-10_000, &enabled)))
 	})
 }
