@@ -172,27 +172,30 @@ type Company struct {
 	BasePlanID        *string            `json:"base_plan_id"`
 	BillingProductIDs JSONSlice[string]  `json:"billing_product_ids"`
 	CreditBalances    map[string]float64 `json:"credit_balances"`
-	// CreditOverageEnabled is the per-credit overage opt-in (SCHX-582), keyed by
-	// billing credit ID — the same key CreditBalances uses. When true for a
-	// credit, consumption continues past a zero balance and accrues against an
-	// overage rate rather than being denied, so the balance stops gating the
-	// check. Absent or false is the historical behaviour, so a caller that does
-	// not send the field keeps hard-stopping at zero.
-	CreditOverageEnabled map[string]bool `json:"credit_overage_enabled"`
-	// CreditOverageCaps is the optional ceiling on overage per credit, in
-	// credits, keyed the same way. It only means anything where
-	// CreditOverageEnabled is true. Present means the balance may run down to
-	// -cap before the check denies; absent means uncapped, which is the
-	// behaviour that shipped before caps existed.
-	CreditOverageCaps map[string]float64             `json:"credit_overage_caps"`
-	Entitlements      JSONSlice[*FeatureEntitlement] `json:"entitlements,omitempty"`
-	Keys              map[string]string              `json:"keys"`
-	Metrics           CompanyMetricCollection        `json:"metrics"`
-	PlanIDs           JSONSlice[string]              `json:"plan_ids"`
-	PlanVersionIDs    JSONSlice[string]              `json:"plan_version_ids"`
-	Rules             JSONSlice[*Rule]               `json:"rules"`
-	Subscription      *Subscription                  `json:"subscription"`
-	Traits            JSONSlice[*Trait]              `json:"traits"`
+	// CreditOverage is per-credit overage config (SCHX-582), keyed by billing
+	// credit ID — the same key CreditBalances uses.
+	//
+	// Three states, which is why the value is nullable rather than this being a
+	// map of caps or a map of bools:
+	//
+	//	key absent  -> overage off; an exhausted balance denies, as it always has
+	//	value nil   -> overage on, uncapped; the balance stops gating the check
+	//	value set   -> overage on, capped; the balance may run down to -cap
+	//
+	// One map rather than an enabled-set plus a cap-map because those two can
+	// disagree — a cap on a credit that is not enabled, or vice versa — and
+	// neither state means anything.
+	//
+	// A caller that does not send the field keeps hard-stopping at zero.
+	CreditOverage  map[string]*float64            `json:"credit_overage"`
+	Entitlements   JSONSlice[*FeatureEntitlement] `json:"entitlements,omitempty"`
+	Keys           map[string]string              `json:"keys"`
+	Metrics        CompanyMetricCollection        `json:"metrics"`
+	PlanIDs        JSONSlice[string]              `json:"plan_ids"`
+	PlanVersionIDs JSONSlice[string]              `json:"plan_version_ids"`
+	Rules          JSONSlice[*Rule]               `json:"rules"`
+	Subscription   *Subscription                  `json:"subscription"`
+	Traits         JSONSlice[*Trait]              `json:"traits"`
 
 	mu sync.Mutex `json:"-"` // mutex for thread safety
 }

@@ -22,11 +22,15 @@ func TestCreditOverage(t *testing.T) {
 
 	const creditID = "test-credit-id"
 
+	// overage: nil leaves the credit out of the map entirely (off); non-nil puts
+	// it in, with the pointed-at value as the cap — nil cap meaning uncapped.
 	companyWith := func(balance float64, overage *bool) *rulesengine.Company {
 		company := createTestCompany()
 		company.CreditBalances = map[string]float64{creditID: balance}
-		if overage != nil {
-			company.CreditOverageEnabled = map[string]bool{creditID: *overage}
+		if overage != nil && *overage {
+			company.CreditOverage = map[string]*float64{creditID: nil}
+		} else if overage != nil {
+			company.CreditOverage = map[string]*float64{}
 		}
 		return company
 	}
@@ -34,7 +38,7 @@ func TestCreditOverage(t *testing.T) {
 	companyWithCap := func(balance float64, cap float64) *rulesengine.Company {
 		enabled := true
 		company := companyWith(balance, &enabled)
-		company.CreditOverageCaps = map[string]float64{creditID: cap}
+		company.CreditOverage = map[string]*float64{creditID: &cap}
 		return company
 	}
 
@@ -140,7 +144,11 @@ func TestCreditOverage(t *testing.T) {
 	// A cap on one credit must not bound a different one.
 	t.Run("cap does not leak across credits", func(t *testing.T) {
 		company := companyWithCap(-140, 100)
-		company.CreditOverageCaps = map[string]float64{"other-credit": 100}
+		otherCap := 100.0
+		company.CreditOverage = map[string]*float64{
+			creditID:       nil,
+			"other-credit": &otherCap,
+		}
 		assert.True(t, matches(t, company))
 	})
 

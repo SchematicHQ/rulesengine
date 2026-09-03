@@ -158,13 +158,12 @@ func (s *RuleCheckService) checkCreditBalanceCondition(ctx context.Context, scop
 	//
 	// Mirrors check_credit_balance_condition in rulesengine-rust; the two must
 	// agree (see SCHY-515) until the Go engine is retired.
-	if scope.Company.CreditOverageEnabled[*condition.CreditID] {
-		overageCap, capped := scope.Company.CreditOverageCaps[*condition.CreditID]
-		if !capped {
+	if overageCap, overageOn := scope.Company.CreditOverage[*condition.CreditID]; overageOn {
+		if overageCap == nil {
 			return true, nil
 		}
 
-		return creditBalance > -overageCap, nil
+		return creditBalance > -*overageCap, nil
 	}
 
 	// Precedence on credit-balance conditions, most specific first. No
