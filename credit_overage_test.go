@@ -35,10 +35,10 @@ func TestCreditOverage(t *testing.T) {
 		return company
 	}
 
-	companyWithCap := func(balance float64, cap float64) *rulesengine.Company {
+	companyWithCap := func(balance float64, limit float64) *rulesengine.Company {
 		enabled := true
 		company := companyWith(balance, &enabled)
-		company.CreditOverage = map[string]*float64{creditID: &cap}
+		company.CreditOverage = map[string]*float64{creditID: &limit}
 		return company
 	}
 
