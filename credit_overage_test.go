@@ -157,4 +157,50 @@ func TestCreditOverage(t *testing.T) {
 		enabled := true
 		assert.True(t, matches(t, companyWith(-10_000, &enabled)))
 	})
+
+	// The cap has to bound the balance *after* this call, not before it.
+	// Checking the balance alone enforces the cap only to within one call's
+	// cost: 5 credits short of the cap, a call costing 50 would pass and land 45
+	// past it.
+	matchesWithCost := func(t *testing.T, company *rulesengine.Company, cost float64) bool {
+		t.Helper()
+
+		flag := createTestFlag()
+		// createTestFlag randomizes DefaultValue and CheckFlag falls back to it
+		// when no rule matches, so a true default would pass without the rule.
+		flag.DefaultValue = false
+		flag.Rules = []*rulesengine.Rule{creditRule()}
+
+		result, err := rulesengine.CheckFlag(
+			ctx, company, nil, flag, rulesengine.WithCreditCost(creditID, cost),
+		)
+		require.NoError(t, err)
+		return result.Value
+	}
+
+	t.Run("denies a cost that would carry past the cap", func(t *testing.T) {
+		assert.False(t, matchesWithCost(t, companyWithCap(-95, 100), 50))
+	})
+
+	t.Run("allows a cost that fits inside the cap", func(t *testing.T) {
+		assert.True(t, matchesWithCost(t, companyWithCap(-40, 100), 50))
+	})
+
+	// Exactly reaching the cap is allowed; the next credit past it is not.
+	t.Run("allows a cost landing exactly on the cap", func(t *testing.T) {
+		assert.True(t, matchesWithCost(t, companyWithCap(-50, 100), 50))
+	})
+
+	// Uncapped ignores the cost entirely — there is no floor to measure against.
+	t.Run("uncapped allows any cost", func(t *testing.T) {
+		enabled := true
+		assert.True(t, matchesWithCost(t, companyWith(-10_000, &enabled), 5_000))
+	})
+
+	// Without overage the allowance is zero, so this stays the balance >= cost
+	// check that has always applied.
+	t.Run("without overage a cost still gates on balance", func(t *testing.T) {
+		assert.False(t, matchesWithCost(t, companyWith(10, nil), 50))
+		assert.True(t, matchesWithCost(t, companyWith(60, nil), 50))
+	})
 }
