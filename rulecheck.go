@@ -134,6 +134,25 @@ func (s *RuleCheckService) checkCreditBalanceCondition(ctx context.Context, scop
 		return false, nil
 	}
 
+	covered := s.creditBalanceCoversCost(scope, condition)
+
+	// The API writes an entitlement's credit condition with lt on the entitling
+	// rule and gte on its usage-exceeded rule, the same pair a metric condition
+	// uses for usage < limit / usage >= limit. There is no spent figure to put on
+	// the left of that comparison, only the balance, so the operator selects a
+	// direction: gt/gte match when the balance does not cover the cost,
+	// everything else when it does.
+	switch condition.Operator {
+	case typeconvert.ComparableOperatorGt, typeconvert.ComparableOperatorGte:
+		return !covered, nil
+	default:
+		return covered, nil
+	}
+}
+
+// creditBalanceCoversCost reports whether the company's balance for the
+// condition's credit covers the cost this check would incur.
+func (s *RuleCheckService) creditBalanceCoversCost(scope *CheckScope, condition *Condition) bool {
 	consumptionRate := float64(1)
 	if condition.ConsumptionRate != nil {
 		consumptionRate = *condition.ConsumptionRate
@@ -179,13 +198,13 @@ func (s *RuleCheckService) checkCreditBalanceCondition(ctx context.Context, scop
 	var overageAllowance float64
 	if overageCap, overageOn := scope.Company.CreditOverage[*condition.CreditID]; overageOn {
 		if overageCap == nil {
-			return true, nil
+			return true
 		}
 
 		overageAllowance = *overageCap
 	}
 
-	return creditBalance+overageAllowance >= cost, nil
+	return creditBalance+overageAllowance >= cost
 }
 
 func (s *RuleCheckService) checkBillingProductCondition(ctx context.Context, company *Company, condition *Condition) (bool, error) {

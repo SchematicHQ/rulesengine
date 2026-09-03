@@ -885,7 +885,9 @@ func TestCheckFlag(t *testing.T) {
 		creditFlag := func(creditID string, consumptionRate float64, eventSubtype *string) (*rulesengine.Flag, *rulesengine.Rule) {
 			rule := createTestRule()
 			condition := createTestCondition(rulesengine.ConditionTypeCredit)
-			condition.Operator = typeconvert.ComparableOperatorGte
+			// lt is what the API writes on an entitling rule's credit condition;
+			// gte marks the usage-exceeded rule and inverts it.
+			condition.Operator = typeconvert.ComparableOperatorLt
 			condition.CreditID = &creditID
 			condition.ConsumptionRate = null.Nullable(consumptionRate)
 			condition.EventSubtype = eventSubtype
