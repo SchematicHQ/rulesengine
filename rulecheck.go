@@ -147,42 +147,45 @@ func (s *RuleCheckService) checkCreditBalanceCondition(ctx context.Context, scop
 		}
 	}
 
-	// SCHX-582: with overage enabled the balance no longer gates the check —
-	// consumption continues past zero and accrues at the configured rate, so
-	// every branch below (all of which compare against the balance) would ask
-	// the wrong question. There is no cap in the current design, so once overage
-	// is on there is nothing further to compare against.
+	// What this call costs, most specific source first. No options supplied
+	// falls through to the legacy single-unit check.
+	//   1. creditCost[credit_id]: caller-supplied per-call cost in credits.
+	//   2. eventUsage, when its event_subtype matches the condition's:
+	//      simulated quantity for this specific event.
+	//   3. usage: generic quantity (no event disambiguation).
+	//   4. Legacy: a single unit at the consumption rate.
+	cost := consumptionRate
+	if creditCost, ok := scope.creditCost[*condition.CreditID]; ok {
+		cost = creditCost
+	} else if eu := scope.eventUsage; eu != nil && condition.EventSubtype != nil &&
+		eu.eventSubtype == *condition.EventSubtype && eu.quantity > 0 {
+		cost = float64(eu.quantity) * consumptionRate
+	} else if scope.usage != nil && *scope.usage > 0 {
+		cost = float64(*scope.usage) * consumptionRate
+	}
+
+	// SCHX-582: overage moves the floor the cost is measured against, rather
+	// than skipping the comparison. Checking the balance alone would enforce the
+	// cap only to within one call: a company at -95 against a cap of 100 would
+	// pass a call costing 50 and land at -145.
+	//
+	// An uncapped grant returns before the comparison — there is no floor to
+	// measure against, and the company is free to run the balance as negative as
+	// it likes. With no overage the allowance is zero, which reduces this to the
+	// balance >= cost check that has always applied.
 	//
 	// Mirrors check_credit_balance_condition in rulesengine-rust; the two must
 	// agree (see SCHY-515) until the Go engine is retired.
-	if scope.Company.CreditOverageEnabled[*condition.CreditID] {
-		return true, nil
+	var overageAllowance float64
+	if overageCap, overageOn := scope.Company.CreditOverage[*condition.CreditID]; overageOn {
+		if overageCap == nil {
+			return true, nil
+		}
+
+		overageAllowance = *overageCap
 	}
 
-	// Precedence on credit-balance conditions, most specific first. No
-	// options supplied falls through to the legacy single-unit check.
-	//   1. creditCost[credit_id]: caller-supplied per-call cost in credits;
-	//      gate on balance >= cost.
-	//   2. eventUsage, when its event_subtype matches the condition's:
-	//      simulated quantity for this specific event; gate on
-	//      balance >= quantity × consumption_rate.
-	//   3. usage: generic quantity (no event disambiguation); gate on
-	//      balance >= quantity × consumption_rate.
-	//   4. Legacy: balance >= consumption_rate (single unit).
-	if cost, ok := scope.creditCost[*condition.CreditID]; ok {
-		return creditBalance >= cost, nil
-	}
-
-	if eu := scope.eventUsage; eu != nil && condition.EventSubtype != nil &&
-		eu.eventSubtype == *condition.EventSubtype && eu.quantity > 0 {
-		return creditBalance >= float64(eu.quantity)*consumptionRate, nil
-	}
-
-	if scope.usage != nil && *scope.usage > 0 {
-		return creditBalance >= float64(*scope.usage)*consumptionRate, nil
-	}
-
-	return creditBalance >= consumptionRate, nil
+	return creditBalance+overageAllowance >= cost, nil
 }
 
 func (s *RuleCheckService) checkBillingProductCondition(ctx context.Context, company *Company, condition *Condition) (bool, error) {
