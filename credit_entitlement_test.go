@@ -113,4 +113,27 @@ func TestCreditEntitlementExceededRule(t *testing.T) {
 		assert.True(t, result.Value)
 		assert.Equal(t, &entitled.ID, result.RuleID)
 	})
+
+	// A capped overage moves the floor to -cap rather than removing it, so the
+	// exceeded rule fires once the cap is spent, the same as a drained balance
+	// with overage off.
+	t.Run("exceeded rule fires once a capped overage is spent", func(t *testing.T) {
+		flag, entitled, exceeded := entitlementFlag()
+		overageCap := 10.0
+
+		company := companyWith(-5)
+		company.CreditOverage = map[string]*float64{creditID: &overageCap}
+		result, err := rulesengine.CheckFlag(ctx, company, nil, flag)
+		require.NoError(t, err)
+		assert.True(t, result.Value, "still inside the cap")
+		assert.Equal(t, &entitled.ID, result.RuleID)
+
+		company = companyWith(-10)
+		company.CreditOverage = map[string]*float64{creditID: &overageCap}
+		result, err = rulesengine.CheckFlag(ctx, company, nil, flag)
+		require.NoError(t, err)
+		assert.False(t, result.Value, "the cap is spent")
+		assert.Equal(t, &exceeded.ID, result.RuleID)
+		assert.Equal(t, rulesengine.RuleTypePlanEntitlementUsageExceeded, *result.RuleType)
+	})
 }
