@@ -135,25 +135,29 @@ type Subscription struct {
 }
 
 type FeatureEntitlement struct {
-	Allocation      *int64                  `json:"allocation" desc:"If the company has a numeric entitlement for this feature, the allocated amount"`
-	ConsumptionRate *float64                `json:"consumption_rate,omitempty" desc:"If the company has a credit-based entitlement for this feature, the credit cost per unit of usage"`
-	CreditID        *string                 `json:"credit_id" desc:"If the company has a credit-based entitlement for this feature, the ID of the credit"`
-	CreditRemaining *float64                `json:"credit_remaining" desc:"If the company has a credit-based entitlement for this feature, the credit available to fund new consumption or a new lease hold — open lease holds are excluded. Clients that hold a lease should gate on this plus their own unspent hold; clients with no lease awareness should use credit_settled instead"`
-	CreditReserved  *float64                `json:"credit_reserved,omitempty" desc:"If the company has a credit-based entitlement for this feature, the unspent amount held by an open credit lease. Returns to credit_remaining when the lease is released"`
-	CreditSettled   *float64                `json:"credit_settled,omitempty" desc:"If the company has a credit-based entitlement for this feature, the balance net of actual consumption, unaffected by open lease holds (credit_remaining plus credit_reserved). The number to display to end users"`
-	CreditTotal     *float64                `json:"credit_total" desc:"If the company has a credit-based entitlement for this feature, the total credit amount"`
-	CreditUsed      *float64                `json:"credit_used" desc:"If the company has a credit-based entitlement for this feature, the amount of credit used"`
-	EventName       *string                 `json:"event_name" desc:"If the feature is event-based, the name of the event tracked for usage"`
-	EventSubtype    *string                 `json:"event_subtype,omitempty" desc:"For event-based or credit-metered feature entitlements, the event subtype whose usage is tracked"`
-	FeatureID       string                  `json:"feature_id" desc:"The ID of the feature"`
-	FeatureKey      string                  `json:"feature_key" desc:"The key of the flag associated with the feature"`
-	MetricPeriod    *MetricPeriod           `json:"metric_period" binding:"oneof=all_time current_day current_month current_week" desc:"For event-based feature entitlements, the period over which usage is tracked"`
-	MetricResetAt   *time.Time              `json:"metric_reset_at" desc:"For event-based feature entitlements, when the usage period will reset"`
-	MonthReset      *MetricPeriodMonthReset `json:"month_reset" binding:"oneof=first_of_month billing_cycle" desc:"For event-based feature entitlements that have a monthly period, whether that monthly reset is based on the calendar month or a billing cycle"`
-	SoftLimit       *int64                  `json:"soft_limit" desc:"For usage-based pricing, the soft limit for overage charges or the next tier boundary"`
-	Usage           *int64                  `json:"usage" desc:"If the company has a numeric entitlement for this feature, the current usage amount"`
-	ValueType       EntitlementValueType    `json:"value_type" binding:"oneof=boolean credit numeric trait unknown unlimited" desc:"The type of the entitlement value"`
-	WarningTiers    JSONSlice[*WarningTier] `json:"warning_tiers,omitempty" desc:"Customer-defined usage warning thresholds configured on this entitlement"`
+	Allocation      *int64     `json:"allocation" desc:"If the company has a numeric entitlement for this feature, the allocated amount"`
+	ConsumptionRate *float64   `json:"consumption_rate,omitempty" desc:"If the company has a credit-based entitlement for this feature, the credit cost per unit of usage"`
+	CreditID        *string    `json:"credit_id" desc:"If the company has a credit-based entitlement for this feature, the ID of the credit"`
+	CreditRemaining *float64   `json:"credit_remaining" desc:"If the company has a credit-based entitlement for this feature, the credit available to fund new consumption or a new lease hold — open lease holds are excluded. Clients that hold a lease should gate on this plus their own unspent hold; clients with no lease awareness should use credit_settled instead"`
+	CreditReserved  *float64   `json:"credit_reserved,omitempty" desc:"If the company has a credit-based entitlement for this feature, the unspent amount held by an open credit lease. Returns to credit_remaining when the lease is released"`
+	CreditSettled   *float64   `json:"credit_settled,omitempty" desc:"If the company has a credit-based entitlement for this feature, the balance net of actual consumption, unaffected by open lease holds (credit_remaining plus credit_reserved). The number to display to end users"`
+	CreditResetAt   *time.Time `json:"credit_reset_at,omitempty" desc:"If the company has a credit-based entitlement for this feature, when a recurring grant next replenishes the credit. Null when the credit is funded only by one-time or purchased grants, which expire rather than reset"`
+	CreditTotal     *float64   `json:"credit_total" deprecated:"true" desc:"Deprecated: Use credit_remaining instead. If the company has a credit-based entitlement for this feature, the total credit amount"`
+	CreditUsed      *float64   `json:"credit_used" desc:"If the company has a credit-based entitlement for this feature, the amount of credit used across the whole credit, not just this feature"`
+	// CreditUsedByThisFeature is the per-feature companion to CreditUsed, which is pool-wide
+	// across every feature that draws on the credit.
+	CreditUsedByThisFeature *float64                `json:"credit_used_by_this_feature,omitempty" desc:"If the company has a credit-based entitlement for this feature, the credit this feature has consumed since the current grant window opened (all-time when there is no recurring grant)"`
+	EventName               *string                 `json:"event_name" desc:"If the feature is event-based, the name of the event tracked for usage"`
+	EventSubtype            *string                 `json:"event_subtype,omitempty" desc:"For event-based or credit-metered feature entitlements, the event subtype whose usage is tracked"`
+	FeatureID               string                  `json:"feature_id" desc:"The ID of the feature"`
+	FeatureKey              string                  `json:"feature_key" desc:"The key of the flag associated with the feature"`
+	MetricPeriod            *MetricPeriod           `json:"metric_period" binding:"oneof=all_time current_day current_month current_week" desc:"For event-based feature entitlements, the period over which usage is tracked"`
+	MetricResetAt           *time.Time              `json:"metric_reset_at" desc:"For event-based feature entitlements, when the usage period will reset"`
+	MonthReset              *MetricPeriodMonthReset `json:"month_reset" binding:"oneof=first_of_month billing_cycle" desc:"For event-based feature entitlements that have a monthly period, whether that monthly reset is based on the calendar month or a billing cycle"`
+	SoftLimit               *int64                  `json:"soft_limit" desc:"For usage-based pricing, the soft limit for overage charges or the next tier boundary"`
+	Usage                   *int64                  `json:"usage" desc:"If the company has a numeric entitlement for this feature, the current usage amount"`
+	ValueType               EntitlementValueType    `json:"value_type" binding:"oneof=boolean credit numeric trait unknown unlimited" desc:"The type of the entitlement value"`
+	WarningTiers            JSONSlice[*WarningTier] `json:"warning_tiers,omitempty" desc:"Customer-defined usage warning thresholds configured on this entitlement"`
 }
 
 // WarningTier is a customer-defined usage warning threshold on a feature
