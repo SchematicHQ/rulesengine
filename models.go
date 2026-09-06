@@ -151,11 +151,11 @@ type FeatureEntitlement struct {
 	EventSubtype            *string                 `json:"event_subtype,omitempty" desc:"For event-based or credit-metered feature entitlements, the event subtype whose usage is tracked"`
 	FeatureID               string                  `json:"feature_id" desc:"The ID of the feature"`
 	FeatureKey              string                  `json:"feature_key" desc:"The key of the flag associated with the feature"`
-	MetricPeriod            *MetricPeriod           `json:"metric_period" binding:"oneof=all_time current_day current_month current_week" desc:"For event-based feature entitlements, the period over which usage is tracked"`
-	MetricResetAt           *time.Time              `json:"metric_reset_at" desc:"For event-based feature entitlements, when the usage period will reset"`
-	MonthReset              *MetricPeriodMonthReset `json:"month_reset" binding:"oneof=first_of_month billing_cycle" desc:"For event-based feature entitlements that have a monthly period, whether that monthly reset is based on the calendar month or a billing cycle"`
+	MetricPeriod            *MetricPeriod           `json:"metric_period" binding:"oneof=all_time current_day current_month current_week" desc:"For event-based feature entitlements, the period over which usage is tracked. Deprecated for credit-based entitlements, which reset on the credit grant; see credit_reset_at"`
+	MetricResetAt           *time.Time              `json:"metric_reset_at" desc:"For event-based feature entitlements, when the usage period will reset. Deprecated for credit-based entitlements: their metric period is not tied to the credit grant, use credit_reset_at instead"`
+	MonthReset              *MetricPeriodMonthReset `json:"month_reset" binding:"oneof=first_of_month billing_cycle" desc:"For event-based feature entitlements that have a monthly period, whether that monthly reset is based on the calendar month or a billing cycle. Deprecated for credit-based entitlements; see credit_reset_at"`
 	SoftLimit               *int64                  `json:"soft_limit" desc:"For usage-based pricing, the soft limit for overage charges or the next tier boundary"`
-	Usage                   *int64                  `json:"usage" desc:"If the company has a numeric entitlement for this feature, the current usage amount"`
+	Usage                   *int64                  `json:"usage" desc:"If the company has a numeric entitlement for this feature, the current usage amount. Deprecated for credit-based entitlements, where it counts events over a metric period unrelated to the credit grant; use credit_used_by_this_feature instead"`
 	ValueType               EntitlementValueType    `json:"value_type" binding:"oneof=boolean credit numeric trait unknown unlimited" desc:"The type of the entitlement value"`
 	WarningTiers            JSONSlice[*WarningTier] `json:"warning_tiers,omitempty" desc:"Customer-defined usage warning thresholds configured on this entitlement"`
 }
