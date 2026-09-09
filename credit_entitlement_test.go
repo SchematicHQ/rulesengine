@@ -100,12 +100,12 @@ func TestCreditEntitlementExceededRule(t *testing.T) {
 		assert.Equal(t, &exceeded.ID, result.RuleID)
 	})
 
-	// Uncapped overage removes the balance gate, so the exceeded rule must stay quiet
+	// Unbounded postpaid removes the balance gate, so the exceeded rule must stay quiet
 	// even at zero.
-	t.Run("exceeded rule does not fire with uncapped overage", func(t *testing.T) {
+	t.Run("exceeded rule does not fire with unbounded postpaid", func(t *testing.T) {
 		flag, entitled, _ := entitlementFlag()
 		company := companyWith(0)
-		company.CreditOverage = map[string]*float64{creditID: nil}
+		company.CreditPostpaidLimit = map[string]*float64{creditID: nil}
 
 		result, err := rulesengine.CheckFlag(ctx, company, nil, flag)
 
@@ -114,22 +114,22 @@ func TestCreditEntitlementExceededRule(t *testing.T) {
 		assert.Equal(t, &entitled.ID, result.RuleID)
 	})
 
-	// A capped overage moves the floor to -cap rather than removing it, so the
+	// A capped postpaid moves the floor to -cap rather than removing it, so the
 	// exceeded rule fires once the cap is spent, the same as a drained balance
-	// with overage off.
-	t.Run("exceeded rule fires once a capped overage is spent", func(t *testing.T) {
+	// with postpaid off.
+	t.Run("exceeded rule fires once a capped postpaid is spent", func(t *testing.T) {
 		flag, entitled, exceeded := entitlementFlag()
-		overageCap := 10.0
+		overdraftLimit := 10.0
 
 		company := companyWith(-5)
-		company.CreditOverage = map[string]*float64{creditID: &overageCap}
+		company.CreditPostpaidLimit = map[string]*float64{creditID: &overdraftLimit}
 		result, err := rulesengine.CheckFlag(ctx, company, nil, flag)
 		require.NoError(t, err)
 		assert.True(t, result.Value, "still inside the cap")
 		assert.Equal(t, &entitled.ID, result.RuleID)
 
 		company = companyWith(-10)
-		company.CreditOverage = map[string]*float64{creditID: &overageCap}
+		company.CreditPostpaidLimit = map[string]*float64{creditID: &overdraftLimit}
 		result, err = rulesengine.CheckFlag(ctx, company, nil, flag)
 		require.NoError(t, err)
 		assert.False(t, result.Value, "the cap is spent")

@@ -172,30 +172,35 @@ type Company struct {
 	BasePlanID        *string            `json:"base_plan_id"`
 	BillingProductIDs JSONSlice[string]  `json:"billing_product_ids"`
 	CreditBalances    map[string]float64 `json:"credit_balances"`
-	// CreditOverage is per-credit overage config (SCHX-582), keyed by billing
-	// credit ID — the same key CreditBalances uses.
+	// CreditPostpaidLimit is per-credit postpaid config, keyed by billing credit
+	// ID — the same key CreditBalances uses. A postpaid grant lets consumption
+	// continue past a zero balance; the negative portion is an overdraft, and the
+	// value here is how far it may run.
 	//
 	// Three states, which is why the value is nullable rather than this being a
-	// map of caps or a map of bools:
+	// map of limits or a map of bools:
 	//
-	//	key absent  -> overage off; an exhausted balance denies, as it always has
-	//	value nil   -> overage on, uncapped; the balance stops gating the check
-	//	value set   -> overage on, capped; the balance may run down to -cap
+	//	key absent  -> postpaid off; an exhausted balance denies, as it always has
+	//	value nil   -> postpaid on, unbounded; the balance stops gating the check
+	//	value set   -> postpaid on, bounded; the balance may run down to -limit
 	//
-	// One map rather than an enabled-set plus a cap-map because those two can
-	// disagree — a cap on a credit that is not enabled, or vice versa — and
+	// One map rather than an enabled-set plus a limit-map because those two can
+	// disagree — a limit on a credit that is not enabled, or vice versa — and
 	// neither state means anything.
 	//
-	// A caller that does not send the field keeps hard-stopping at zero.
-	CreditOverage  map[string]*float64            `json:"credit_overage"`
-	Entitlements   JSONSlice[*FeatureEntitlement] `json:"entitlements,omitempty"`
-	Keys           map[string]string              `json:"keys"`
-	Metrics        CompanyMetricCollection        `json:"metrics"`
-	PlanIDs        JSONSlice[string]              `json:"plan_ids"`
-	PlanVersionIDs JSONSlice[string]              `json:"plan_version_ids"`
-	Rules          JSONSlice[*Rule]               `json:"rules"`
-	Subscription   *Subscription                  `json:"subscription"`
-	Traits         JSONSlice[*Trait]              `json:"traits"`
+	// omitempty on purpose: absent must be a legal payload, so that a client
+	// generated against a spec that predates this field cannot fail a
+	// required-property check on it. A caller that does not send it keeps
+	// hard-stopping at zero.
+	CreditPostpaidLimit map[string]*float64            `json:"credit_postpaid_limit,omitempty"`
+	Entitlements        JSONSlice[*FeatureEntitlement] `json:"entitlements,omitempty"`
+	Keys                map[string]string              `json:"keys"`
+	Metrics             CompanyMetricCollection        `json:"metrics"`
+	PlanIDs             JSONSlice[string]              `json:"plan_ids"`
+	PlanVersionIDs      JSONSlice[string]              `json:"plan_version_ids"`
+	Rules               JSONSlice[*Rule]               `json:"rules"`
+	Subscription        *Subscription                  `json:"subscription"`
+	Traits              JSONSlice[*Trait]              `json:"traits"`
 
 	mu sync.Mutex `json:"-"` // mutex for thread safety
 }

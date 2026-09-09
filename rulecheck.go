@@ -183,28 +183,28 @@ func (s *RuleCheckService) creditBalanceCoversCost(scope *CheckScope, condition 
 		cost = float64(*scope.usage) * consumptionRate
 	}
 
-	// SCHX-582: overage moves the floor the cost is measured against, rather
-	// than skipping the comparison. Checking the balance alone would enforce the
-	// cap only to within one call: a company at -95 against a cap of 100 would
-	// pass a call costing 50 and land at -145.
+	// A postpaid grant moves the floor the cost is measured against, rather than
+	// skipping the comparison. Checking the balance alone would enforce the
+	// overdraft limit only to within one call: a company at -95 against a limit
+	// of 100 would pass a call costing 50 and land at -145.
 	//
-	// An uncapped grant returns before the comparison — there is no floor to
-	// measure against, and the company is free to run the balance as negative as
-	// it likes. With no overage the allowance is zero, which reduces this to the
+	// An unbounded grant returns before the comparison — there is no floor to
+	// measure against, and the company is free to run the overdraft as deep as it
+	// likes. With postpaid off the allowance is zero, which reduces this to the
 	// balance >= cost check that has always applied.
 	//
 	// Mirrors check_credit_balance_condition in rulesengine-rust; the two must
 	// agree (see SCHY-515) until the Go engine is retired.
-	var overageAllowance float64
-	if overageCap, overageOn := scope.Company.CreditOverage[*condition.CreditID]; overageOn {
-		if overageCap == nil {
+	var overdraftAllowance float64
+	if overdraftLimit, postpaidOn := scope.Company.CreditPostpaidLimit[*condition.CreditID]; postpaidOn {
+		if overdraftLimit == nil {
 			return true
 		}
 
-		overageAllowance = *overageCap
+		overdraftAllowance = *overdraftLimit
 	}
 
-	return creditBalance+overageAllowance >= cost
+	return creditBalance+overdraftAllowance >= cost
 }
 
 func (s *RuleCheckService) checkBillingProductCondition(ctx context.Context, company *Company, condition *Condition) (bool, error) {
