@@ -11,26 +11,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// SCHX-582: credit overage. With overage enabled on a credit, consumption
+// SCHX-582: credit postpaid. With postpaid enabled on a credit, consumption
 // continues past a zero balance and accrues at a configured rate, so the balance
 // stops gating the check.
 //
-// These mirror credit_overage_tests in rulesengine-rust; the two engines must
+// These mirror credit_postpaid_limit_tests in rulesengine-rust; the two engines must
 // agree (SCHY-515) for as long as both are in use.
-func TestCreditOverage(t *testing.T) {
+func TestCreditPostpaidLimit(t *testing.T) {
 	ctx := context.Background()
 
 	const creditID = "test-credit-id"
 
-	// overage: nil leaves the credit out of the map entirely (off); non-nil puts
-	// it in, with the pointed-at value as the cap — nil cap meaning uncapped.
-	companyWith := func(balance float64, overage *bool) *rulesengine.Company {
+	// postpaid: nil leaves the credit out of the map entirely (off); non-nil puts
+	// it in, with the pointed-at value as the cap — nil cap meaning unbounded.
+	companyWith := func(balance float64, postpaid *bool) *rulesengine.Company {
 		company := createTestCompany()
 		company.CreditBalances = map[string]float64{creditID: balance}
-		if overage != nil && *overage {
-			company.CreditOverage = map[string]*float64{creditID: nil}
-		} else if overage != nil {
-			company.CreditOverage = map[string]*float64{}
+		if postpaid != nil && *postpaid {
+			company.CreditPostpaidLimit = map[string]*float64{creditID: nil}
+		} else if postpaid != nil {
+			company.CreditPostpaidLimit = map[string]*float64{}
 		}
 		return company
 	}
@@ -38,7 +38,7 @@ func TestCreditOverage(t *testing.T) {
 	companyWithCap := func(balance float64, limit float64) *rulesengine.Company {
 		enabled := true
 		company := companyWith(balance, &enabled)
-		company.CreditOverage = map[string]*float64{creditID: &limit}
+		company.CreditPostpaidLimit = map[string]*float64{creditID: &limit}
 		return company
 	}
 
@@ -63,7 +63,7 @@ func TestCreditOverage(t *testing.T) {
 	}
 
 	// The existing hard stop, unchanged when nobody has opted in.
-	t.Run("denies at zero without overage", func(t *testing.T) {
+	t.Run("denies at zero without postpaid", func(t *testing.T) {
 		assert.False(t, matches(t, companyWith(0, nil)))
 	})
 
@@ -72,11 +72,11 @@ func TestCreditOverage(t *testing.T) {
 	})
 
 	// The point of the feature.
-	t.Run("allows past zero with overage enabled", func(t *testing.T) {
+	t.Run("allows past zero with postpaid enabled", func(t *testing.T) {
 		assert.True(t, matches(t, companyWith(0, null.Nullable(true))))
 	})
 
-	// A negative balance is legal (SCH-5103); overage is what makes it billable,
+	// A negative balance is legal (SCH-5103); postpaid is what makes it billable,
 	// and an already-overdrafted company must keep working.
 	t.Run("allows when already negative", func(t *testing.T) {
 		assert.True(t, matches(t, companyWith(-40, null.Nullable(true))))
@@ -88,7 +88,7 @@ func TestCreditOverage(t *testing.T) {
 		assert.False(t, matches(t, companyWith(0, null.Nullable(false))))
 	})
 
-	// Overage is per credit: enabling it on one must not unblock another.
+	// Postpaid is per credit: enabling it on one must not unblock another.
 	t.Run("does not leak across credits", func(t *testing.T) {
 		company := companyWith(0, null.Nullable(true))
 		company.CreditBalances["other-credit-id"] = 0
@@ -104,10 +104,10 @@ func TestCreditOverage(t *testing.T) {
 			Rule:    rule,
 		})
 		require.NoError(t, err)
-		assert.False(t, result.Match, "the other credit has no overage and no balance")
+		assert.False(t, result.Match, "the other credit has no postpaid and no balance")
 	})
 
-	// Overage has to beat the more specific branches too. A caller-supplied
+	// Postpaid has to beat the more specific branches too. A caller-supplied
 	// credit cost would otherwise re-impose the balance gate it short-circuits.
 	t.Run("overrides the credit cost option", func(t *testing.T) {
 		flag := createTestFlag()
@@ -145,15 +145,15 @@ func TestCreditOverage(t *testing.T) {
 	t.Run("cap does not leak across credits", func(t *testing.T) {
 		company := companyWithCap(-140, 100)
 		otherCap := 100.0
-		company.CreditOverage = map[string]*float64{
+		company.CreditPostpaidLimit = map[string]*float64{
 			creditID:       nil,
 			"other-credit": &otherCap,
 		}
 		assert.True(t, matches(t, company))
 	})
 
-	// Absent cap keeps the uncapped behaviour that shipped first.
-	t.Run("no cap means uncapped", func(t *testing.T) {
+	// Absent cap keeps the unbounded behaviour that shipped first.
+	t.Run("no cap means unbounded", func(t *testing.T) {
 		enabled := true
 		assert.True(t, matches(t, companyWith(-10_000, &enabled)))
 	})
@@ -191,15 +191,15 @@ func TestCreditOverage(t *testing.T) {
 		assert.True(t, matchesWithCost(t, companyWithCap(-50, 100), 50))
 	})
 
-	// Uncapped ignores the cost entirely — there is no floor to measure against.
-	t.Run("uncapped allows any cost", func(t *testing.T) {
+	// Unbounded ignores the cost entirely — there is no floor to measure against.
+	t.Run("unbounded allows any cost", func(t *testing.T) {
 		enabled := true
 		assert.True(t, matchesWithCost(t, companyWith(-10_000, &enabled), 5_000))
 	})
 
-	// Without overage the allowance is zero, so this stays the balance >= cost
+	// Without postpaid the allowance is zero, so this stays the balance >= cost
 	// check that has always applied.
-	t.Run("without overage a cost still gates on balance", func(t *testing.T) {
+	t.Run("without postpaid a cost still gates on balance", func(t *testing.T) {
 		assert.False(t, matchesWithCost(t, companyWith(10, nil), 50))
 		assert.True(t, matchesWithCost(t, companyWith(60, nil), 50))
 	})
