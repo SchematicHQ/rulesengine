@@ -652,17 +652,16 @@ func TestGetNextMetricPeriodStartFromCondition(t *testing.T) {
 	})
 }
 
-// A subscription anchored on the 31st must reset on the last day of shorter
-// months, never spill into the following month. These run against the real clock,
-// so they assert the invariants that hold on every date rather than a fixed day.
+// A 31st anchor resets on the last day of shorter months, never the next month.
+// These run against the real clock, so they assert what holds on every date.
 func TestBillingCycleAnchoredOnThe31st(t *testing.T) {
 	now := time.Now().UTC()
 	lastDayOf := func(ts time.Time) int {
 		return time.Date(ts.Year(), ts.Month()+1, 0, 0, 0, 0, 0, time.UTC).Day()
 	}
 	company := createTestCompany()
-	// Started on the most recent 31st at least a year ago, so the anchor day is
-	// always 31 and the subscription is always in progress.
+	// Started on January 31 of last year, so the anchor day is 31 and the
+	// subscription is in progress on every date this test can run.
 	company.Subscription.PeriodStart = time.Date(now.Year()-1, time.January, 31, 12, 0, 0, 0, time.UTC)
 	company.Subscription.PeriodEnd = now.AddDate(0, 2, 0)
 

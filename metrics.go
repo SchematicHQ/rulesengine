@@ -138,11 +138,9 @@ func GetCurrentMetricPeriodStartForCalendarMetricPeriod(metricPeriod MetricPerio
 	return nil
 }
 
-// billingAnniversaryInMonth returns the subscription's monthly reset moment within
-// the given month: the anchor's day of month, or the month's last day when the
-// anchor day does not exist in it (a subscription started on the 31st resets on
-// the 30th in a 30-day month and on the 28th or 29th in February). Building the
-// date directly would let Go normalize "September 31" into October 1, placing the
+// billingAnniversaryInMonth returns the subscription's monthly reset within the
+// given month, with the anchor day clamped to the month's last day. Building the
+// date directly lets Go normalize "September 31" into October 1, which puts the
 // reset in the wrong month.
 func billingAnniversaryInMonth(year int, month time.Month, anchor time.Time) time.Time {
 	day := anchor.Day()
