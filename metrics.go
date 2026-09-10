@@ -152,17 +152,27 @@ func billingAnniversaryInMonth(year int, month time.Month, anchor time.Time) tim
 
 // Given a company, determine the beginning of the current metric period based on the company's billing subscription
 func GetCurrentMetricPeriodStartForCompanyBillingSubscription(company *Company) *time.Time {
+	if company == nil {
+		return currentBillingPeriodStartAt(nil, time.Now().UTC())
+	}
+	return currentBillingPeriodStartAt(company.Subscription, time.Now().UTC())
+}
+
+// currentBillingPeriodStartAt is GetCurrentMetricPeriodStartForCompanyBillingSubscription
+// evaluated at a given instant, so the month arithmetic can be tested on any date.
+func currentBillingPeriodStartAt(subscription *Subscription, now time.Time) *time.Time {
 	// if no subscription exists, we use calendar month reset
-	if company == nil || company.Subscription == nil {
-		return GetCurrentMetricPeriodStartForCalendarMetricPeriod(MetricPeriodCurrentMonth)
+	if subscription == nil {
+		firstOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+		return &firstOfMonth
 	}
 
-	now := time.Now().UTC()
-	periodStart := company.Subscription.PeriodStart
+	periodStart := subscription.PeriodStart
 
 	// if the start period is in the future, the metric period is from the start of the current calendar month
 	if periodStart.After(now) {
-		return GetCurrentMetricPeriodStartForCalendarMetricPeriod(MetricPeriodCurrentMonth)
+		firstOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+		return &firstOfMonth
 	}
 
 	// find the most recent reset date based on subscription start date
@@ -223,21 +233,27 @@ func GetNextMetricPeriodStartForCompanyBillingSubscription(company *Company) *ti
 // GetNextMetricPeriodStartForSubscription determines the next metric period start based on the
 // subscription's billing cycle. If subscription is nil, returns the start of the next calendar month.
 func GetNextMetricPeriodStartForSubscription(subscription *Subscription) *time.Time {
+	return nextBillingPeriodStartAt(subscription, time.Now().UTC())
+}
+
+// nextBillingPeriodStartAt is GetNextMetricPeriodStartForSubscription evaluated at a
+// given instant, so the month arithmetic can be tested on any date.
+func nextBillingPeriodStartAt(subscription *Subscription, now time.Time) *time.Time {
+	startOfNextMonth := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, time.UTC)
+
 	// if no subscription exists, we use calendar month reset
 	if subscription == nil {
-		return GetNextMetricPeriodStartForCalendarMetricPeriod(MetricPeriodCurrentMonth)
+		return &startOfNextMonth
 	}
 
-	now := time.Now().UTC()
 	periodEnd := subscription.PeriodEnd
 	periodStart := subscription.PeriodStart
 
 	// if the start period is in the future, the metric period is from the start of the current calendar month until either
 	// the end of the current calendar month or the start of the billing period, whichever comes first
 	if periodStart.After(now) {
-		startOfNextMonth := GetNextMetricPeriodStartForCalendarMetricPeriod(MetricPeriodCurrentMonth)
-		if periodStart.After(*startOfNextMonth) {
-			return startOfNextMonth
+		if periodStart.After(startOfNextMonth) {
+			return &startOfNextMonth
 		}
 
 		return &periodStart
