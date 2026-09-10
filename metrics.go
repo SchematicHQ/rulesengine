@@ -138,6 +138,20 @@ func GetCurrentMetricPeriodStartForCalendarMetricPeriod(metricPeriod MetricPerio
 	return nil
 }
 
+// billingAnniversaryInMonth returns the subscription's monthly reset moment within
+// the given month: the anchor's day of month, or the month's last day when the
+// anchor day does not exist in it (a subscription started on the 31st resets on
+// the 30th in a 30-day month and on the 28th or 29th in February). Building the
+// date directly would let Go normalize "September 31" into October 1, placing the
+// reset in the wrong month.
+func billingAnniversaryInMonth(year int, month time.Month, anchor time.Time) time.Time {
+	day := anchor.Day()
+	if lastDay := time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day(); day > lastDay {
+		day = lastDay
+	}
+	return time.Date(year, month, day, anchor.Hour(), anchor.Minute(), anchor.Second(), anchor.Nanosecond(), time.UTC)
+}
+
 // Given a company, determine the beginning of the current metric period based on the company's billing subscription
 func GetCurrentMetricPeriodStartForCompanyBillingSubscription(company *Company) *time.Time {
 	// if no subscription exists, we use calendar month reset
@@ -154,20 +168,12 @@ func GetCurrentMetricPeriodStartForCompanyBillingSubscription(company *Company) 
 	}
 
 	// find the most recent reset date based on subscription start date
-	currentReset := time.Date(
-		now.Year(),
-		now.Month(),
-		periodStart.Day(),
-		periodStart.Hour(),
-		periodStart.Minute(),
-		periodStart.Second(),
-		periodStart.Nanosecond(),
-		time.UTC,
-	)
+	currentReset := billingAnniversaryInMonth(now.Year(), now.Month(), periodStart)
 
 	// if the reset date for current month is in the future, use previous month's reset date
 	if currentReset.After(now) {
-		currentReset = currentReset.AddDate(0, -1, 0)
+		previousMonth := time.Date(now.Year(), now.Month()-1, 1, 0, 0, 0, 0, time.UTC)
+		currentReset = billingAnniversaryInMonth(previousMonth.Year(), previousMonth.Month(), periodStart)
 	}
 
 	// if the current reset is before the subscription period start, use the period start instead
@@ -239,21 +245,13 @@ func GetNextMetricPeriodStartForSubscription(subscription *Subscription) *time.T
 		return &periodStart
 	}
 
-	// month metric period will reset on the same day/hour/minute/second as the susbcription started every month; get that timestamp for the current month
-	nextReset := time.Date(
-		now.Year(),
-		now.Month(),
-		periodStart.Day(),
-		periodStart.Hour(),
-		periodStart.Minute(),
-		periodStart.Second(),
-		periodStart.Nanosecond(),
-		time.UTC,
-	)
+	// month metric period will reset on the same day/hour/minute/second as the subscription started every month; get that timestamp for the current month
+	nextReset := billingAnniversaryInMonth(now.Year(), now.Month(), periodStart)
 
 	// if we've already passed this month's reset date, move to next month
 	if !nextReset.After(now) {
-		nextReset = nextReset.AddDate(0, 1, 0)
+		nextMonth := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, time.UTC)
+		nextReset = billingAnniversaryInMonth(nextMonth.Year(), nextMonth.Month(), periodStart)
 	}
 
 	// if the next reset is after the end of the billing period, use the end of the billing period instead

@@ -651,3 +651,36 @@ func TestGetNextMetricPeriodStartFromCondition(t *testing.T) {
 		assert.Equal(t, expected.Unix(), result.Unix())
 	})
 }
+
+// A subscription anchored on the 31st must reset on the last day of shorter
+// months, never spill into the following month. These run against the real clock,
+// so they assert the invariants that hold on every date rather than a fixed day.
+func TestBillingCycleAnchoredOnThe31st(t *testing.T) {
+	now := time.Now().UTC()
+	lastDayOf := func(ts time.Time) int {
+		return time.Date(ts.Year(), ts.Month()+1, 0, 0, 0, 0, 0, time.UTC).Day()
+	}
+	company := createTestCompany()
+	// Started on the most recent 31st at least a year ago, so the anchor day is
+	// always 31 and the subscription is always in progress.
+	company.Subscription.PeriodStart = time.Date(now.Year()-1, time.January, 31, 12, 0, 0, 0, time.UTC)
+	company.Subscription.PeriodEnd = now.AddDate(0, 2, 0)
+
+	t.Run("current period start", func(t *testing.T) {
+		result := rulesengine.GetCurrentMetricPeriodStartForCompanyBillingSubscription(company)
+		assert.NotNil(t, result)
+		assert.False(t, result.After(now), "the current period must already have started")
+		assert.True(t, now.Sub(*result) < 32*24*time.Hour, "the current period started within the last month, got %s", result)
+		assert.Equal(t, min(31, lastDayOf(*result)), result.Day(), "reset on the 31st, or the last day of a shorter month")
+		assert.Equal(t, 12, result.Hour())
+	})
+
+	t.Run("next period start", func(t *testing.T) {
+		result := rulesengine.GetNextMetricPeriodStartForCompanyBillingSubscription(company)
+		assert.NotNil(t, result)
+		assert.True(t, result.After(now), "the next reset must be in the future")
+		assert.True(t, result.Sub(now) <= 31*24*time.Hour, "the next reset is within a month, got %s", result)
+		assert.Equal(t, min(31, lastDayOf(*result)), result.Day(), "reset on the 31st, or the last day of a shorter month")
+		assert.Equal(t, 12, result.Hour())
+	})
+}
