@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Presence of a credit's key is the postpaid opt-in, and null never means
-// anything on its own: a null map is an empty map, a null config is {}, and a
-// null limit is no limit. An earlier shape used a nullable number as the map
+// Presence of a credit's key is the postpaid opt-in, and null always reads as
+// absent: a null map is an empty map, a null config drops the credit (off), and
+// a null limit is no limit. An earlier shape used a nullable number as the map
 // value, and SDKs that strip null map values read "unbounded" as "off".
 //
 // Mirrors credit_postpaid_serialization_test.rs in rulesengine-rust.
@@ -32,7 +32,8 @@ func TestCreditPostpaidSerialization(t *testing.T) {
 			{name: "credit absent", raw: `{"credit_postpaid":{}}`},
 			{name: "empty config is on and unbounded", raw: `{"credit_postpaid":{"test-credit-id":{}}}`, postpaidOn: true},
 			{name: "null limit is on and unbounded", raw: `{"credit_postpaid":{"test-credit-id":{"overdraft_limit":null}}}`, postpaidOn: true},
-			{name: "null config is on and unbounded", raw: `{"credit_postpaid":{"test-credit-id":null}}`, postpaidOn: true},
+			{name: "null config is off", raw: `{"credit_postpaid":{"test-credit-id":null}}`},
+			{name: "null config drops only its own credit", raw: `{"credit_postpaid":{"test-credit-id":{},"other-credit-id":null}}`, postpaidOn: true},
 			{name: "numeric limit is on and capped", raw: `{"credit_postpaid":{"test-credit-id":{"overdraft_limit":100}}}`, postpaidOn: true, limit: &hundred},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
