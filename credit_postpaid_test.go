@@ -15,22 +15,22 @@ import (
 // continues past a zero balance and accrues at a configured rate, so the balance
 // stops gating the check.
 //
-// These mirror credit_postpaid_limit_tests in rulesengine-rust; the two engines must
+// These mirror credit_postpaid_tests in rulesengine-rust; the two engines must
 // agree (SCHY-515) for as long as both are in use.
-func TestCreditPostpaidLimit(t *testing.T) {
+func TestCreditPostpaid(t *testing.T) {
 	ctx := context.Background()
 
 	const creditID = "test-credit-id"
 
-	// postpaid: nil leaves the credit out of the map entirely (off); non-nil puts
-	// it in, with the pointed-at value as the cap — nil cap meaning unbounded.
+	// postpaid: nil leaves the credit out of the map entirely (off); true puts it
+	// in with no cap (unbounded); false is an explicit empty map (off).
 	companyWith := func(balance float64, postpaid *bool) *rulesengine.Company {
 		company := createTestCompany()
 		company.CreditBalances = map[string]float64{creditID: balance}
 		if postpaid != nil && *postpaid {
-			company.CreditPostpaidLimit = map[string]*float64{creditID: nil}
+			company.CreditPostpaid = map[string]rulesengine.CreditPostpaidConfig{creditID: {}}
 		} else if postpaid != nil {
-			company.CreditPostpaidLimit = map[string]*float64{}
+			company.CreditPostpaid = map[string]rulesengine.CreditPostpaidConfig{}
 		}
 		return company
 	}
@@ -38,7 +38,9 @@ func TestCreditPostpaidLimit(t *testing.T) {
 	companyWithCap := func(balance float64, limit float64) *rulesengine.Company {
 		enabled := true
 		company := companyWith(balance, &enabled)
-		company.CreditPostpaidLimit = map[string]*float64{creditID: &limit}
+		company.CreditPostpaid = map[string]rulesengine.CreditPostpaidConfig{
+			creditID: {OverdraftLimit: &limit},
+		}
 		return company
 	}
 
@@ -145,9 +147,9 @@ func TestCreditPostpaidLimit(t *testing.T) {
 	t.Run("cap does not leak across credits", func(t *testing.T) {
 		company := companyWithCap(-140, 100)
 		otherCap := 100.0
-		company.CreditPostpaidLimit = map[string]*float64{
-			creditID:       nil,
-			"other-credit": &otherCap,
+		company.CreditPostpaid = map[string]rulesengine.CreditPostpaidConfig{
+			creditID:       {},
+			"other-credit": {OverdraftLimit: &otherCap},
 		}
 		assert.True(t, matches(t, company))
 	})

@@ -196,12 +196,12 @@ func (s *RuleCheckService) creditBalanceCoversCost(scope *CheckScope, condition 
 	// Mirrors check_credit_balance_condition in rulesengine-rust; the two must
 	// agree (see SCHY-515) until the Go engine is retired.
 	var overdraftAllowance float64
-	if overdraftLimit, postpaidOn := scope.Company.CreditPostpaidLimit[*condition.CreditID]; postpaidOn {
-		if overdraftLimit == nil {
+	if postpaid, postpaidOn := scope.Company.CreditPostpaid[*condition.CreditID]; postpaidOn {
+		if postpaid.OverdraftLimit == nil {
 			return true
 		}
 
-		overdraftAllowance = *overdraftLimit
+		overdraftAllowance = *postpaid.OverdraftLimit
 	}
 
 	return creditBalance+overdraftAllowance >= cost

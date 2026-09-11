@@ -105,7 +105,7 @@ func TestCreditEntitlementExceededRule(t *testing.T) {
 	t.Run("exceeded rule does not fire with unbounded postpaid", func(t *testing.T) {
 		flag, entitled, _ := entitlementFlag()
 		company := companyWith(0)
-		company.CreditPostpaidLimit = map[string]*float64{creditID: nil}
+		company.CreditPostpaid = map[string]rulesengine.CreditPostpaidConfig{creditID: {}}
 
 		result, err := rulesengine.CheckFlag(ctx, company, nil, flag)
 
@@ -121,15 +121,17 @@ func TestCreditEntitlementExceededRule(t *testing.T) {
 		flag, entitled, exceeded := entitlementFlag()
 		overdraftLimit := 10.0
 
+		postpaid := map[string]rulesengine.CreditPostpaidConfig{creditID: {OverdraftLimit: &overdraftLimit}}
+
 		company := companyWith(-5)
-		company.CreditPostpaidLimit = map[string]*float64{creditID: &overdraftLimit}
+		company.CreditPostpaid = postpaid
 		result, err := rulesengine.CheckFlag(ctx, company, nil, flag)
 		require.NoError(t, err)
 		assert.True(t, result.Value, "still inside the cap")
 		assert.Equal(t, &entitled.ID, result.RuleID)
 
 		company = companyWith(-10)
-		company.CreditPostpaidLimit = map[string]*float64{creditID: &overdraftLimit}
+		company.CreditPostpaid = postpaid
 		result, err = rulesengine.CheckFlag(ctx, company, nil, flag)
 		require.NoError(t, err)
 		assert.False(t, result.Value, "the cap is spent")
