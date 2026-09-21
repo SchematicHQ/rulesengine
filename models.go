@@ -176,22 +176,25 @@ type Company struct {
 	BasePlanID        *string            `json:"base_plan_id"`
 	BillingProductIDs JSONSlice[string]  `json:"billing_product_ids"`
 	CreditBalances    map[string]float64 `json:"credit_balances"`
-	// CreditOverage is per-credit overage config (SCHX-582), keyed by billing
-	// credit ID — the same key CreditBalances uses.
+	// CreditPostpaid is per-credit postpaid config, keyed by billing credit ID —
+	// the same key CreditBalances uses. A postpaid grant lets consumption
+	// continue past a zero balance; the negative portion is an overdraft.
 	//
-	// Three states, which is why the value is nullable rather than this being a
-	// map of caps or a map of bools:
+	//	key absent             -> postpaid off; an exhausted balance denies
+	//	key present, no limit  -> postpaid on, unbounded
+	//	key present, limit set -> postpaid on; the balance may run down to -limit
 	//
-	//	key absent  -> overage off; an exhausted balance denies, as it always has
-	//	value nil   -> overage on, uncapped; the balance stops gating the check
-	//	value set   -> overage on, capped; the balance may run down to -cap
+	// Presence of the key is the opt-in, and null always reads as absent: a null
+	// map is an empty map, a null config drops the credit (postpaid off), and a
+	// null limit is no limit. An earlier shape put the limit directly in the map
+	// as a nullable number, and SDKs that strip null map values turned
+	// "unbounded" into "off".
 	//
-	// One map rather than an enabled-set plus a cap-map because those two can
-	// disagree — a cap on a credit that is not enabled, or vice versa — and
-	// neither state means anything.
-	//
-	// A caller that does not send the field keeps hard-stopping at zero.
-	CreditOverage  map[string]*float64            `json:"credit_overage"`
+	// omitempty on purpose: absent must be a legal payload, so that a client
+	// generated against a spec that predates this field cannot fail a
+	// required-property check on it. A caller that does not send it keeps
+	// hard-stopping at zero.
+	CreditPostpaid CreditPostpaidMap              `json:"credit_postpaid,omitempty"`
 	Entitlements   JSONSlice[*FeatureEntitlement] `json:"entitlements,omitempty"`
 	Keys           map[string]string              `json:"keys"`
 	Metrics        CompanyMetricCollection        `json:"metrics"`
@@ -202,6 +205,42 @@ type Company struct {
 	Traits         JSONSlice[*Trait]              `json:"traits"`
 
 	mu sync.Mutex `json:"-"` // mutex for thread safety
+}
+
+// CreditPostpaidConfig is one credit's entry in Company.CreditPostpaid.
+type CreditPostpaidConfig struct {
+	// OverdraftLimit is how far below zero the balance may run. Nil means no
+	// limit.
+	OverdraftLimit *float64 `json:"overdraft_limit,omitempty"`
+}
+
+// CreditPostpaidMap is Company.CreditPostpaid, keyed by billing credit ID.
+type CreditPostpaidMap map[string]CreditPostpaidConfig
+
+// UnmarshalJSON drops every credit whose value is null. Plain decoding would
+// keep the key with a zero config, which reads as postpaid on with no limit;
+// SDKs that strip null map values before calling the engine read the same
+// payload as off, and a malformed entry should fail closed.
+func (m *CreditPostpaidMap) UnmarshalJSON(data []byte) error {
+	var raw map[string]*CreditPostpaidConfig
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	if raw == nil {
+		*m = nil
+		return nil
+	}
+
+	decoded := make(CreditPostpaidMap, len(raw))
+	for creditID, postpaid := range raw {
+		if postpaid != nil {
+			decoded[creditID] = *postpaid
+		}
+	}
+
+	*m = decoded
+	return nil
 }
 
 func (c *Company) getTraitByDefinitionID(traitDefinitionID string) *Trait {
