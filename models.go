@@ -55,6 +55,12 @@ type Condition struct {
 	// Fields relevant when ConditionType = Billing Credit
 	CreditID        *string  `json:"credit_id"`
 	ConsumptionRate *float64 `json:"consumption_rate"`
+	// QuantityRates is the credits per unit of each quantity an event carries,
+	// keyed by quantity key. The WASM engine prices an event_quantities
+	// preflight with it alongside ConsumptionRate, which stays the per-request
+	// rate. This engine does not read it; it is carried so the field survives
+	// a decode and re-encode (the replicator's cache, for one).
+	QuantityRates map[string]float64 `json:"quantity_rates,omitempty"`
 
 	// Fields relevant when ConditionType = Trait
 	TraitDefinition *TraitDefinition `json:"trait_definition"`
@@ -150,6 +156,7 @@ type FeatureEntitlement struct {
 	MetricPeriod    *MetricPeriod           `json:"metric_period" binding:"oneof=all_time current_day current_month current_week" desc:"For event-based feature entitlements, the period over which usage is tracked"`
 	MetricResetAt   *time.Time              `json:"metric_reset_at" desc:"For event-based feature entitlements, when the usage period will reset"`
 	MonthReset      *MetricPeriodMonthReset `json:"month_reset" binding:"oneof=first_of_month billing_cycle" desc:"For event-based feature entitlements that have a monthly period, whether that monthly reset is based on the calendar month or a billing cycle"`
+	QuantityRates   map[string]float64      `json:"quantity_rates,omitempty" desc:"If the company has a credit-based entitlement for this feature, the credit cost per unit of each quantity an event carries, keyed by quantity key"`
 	SoftLimit       *int64                  `json:"soft_limit" desc:"For usage-based pricing, the soft limit for overage charges or the next tier boundary"`
 	Usage           *int64                  `json:"usage" desc:"If the company has a numeric entitlement for this feature, the current usage amount"`
 	ValueType       EntitlementValueType    `json:"value_type" binding:"oneof=boolean credit numeric trait unknown unlimited" desc:"The type of the entitlement value"`
